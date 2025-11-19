@@ -1,6 +1,6 @@
-# LessRTC
+# WebRTC
 
-LessRTC 是一个基于 Go 的最小可用 WebRTC 示例项目，提供 WebSocket 信令服务器与浏览器端 Demo，适合作为实时音视频应用的入门模板。
+WebRTC 是一个基于 Go 的最小可用 WebRTC 示例项目，提供 WebSocket 信令服务器与浏览器端 Demo，适合作为实时音视频应用的入门模板。
 
 ## 特性
 
@@ -20,8 +20,8 @@ LessRTC 是一个基于 Go 的最小可用 WebRTC 示例项目，提供 WebSocke
 ### 克隆项目
 
 ```powershell
-git clone https://github.com/<your-org>/LessRTC.git
-cd LessRTC
+git clone https://github.com/<your-org>/WebRTC.git
+cd WebRTC
 ```
 
 ### 配置代理（可选，建议国内开发者设置）
@@ -56,7 +56,7 @@ go run ./cmd/server
 ## 项目结构
 
 ```
-LessRTC/
+WebRTC/
 ├── cmd/
 │   └── server/        # HTTP + WebSocket 服务入口
 ├── internal/
