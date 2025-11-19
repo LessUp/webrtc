@@ -1,6 +1,7 @@
 package signal
 
 import (
+	"log"
 	"net/http"
 	"sync"
 
@@ -32,8 +33,10 @@ func NewHub() *Hub {
 func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 	c, err := h.upg.Upgrade(w, r, nil)
 	if err != nil {
+		log.Printf("signal: ws upgrade failed from %s: %v", r.RemoteAddr, err)
 		return
 	}
+	log.Printf("signal: ws connected from %s", r.RemoteAddr)
 	client := &Client{conn: c, send: make(chan Message, 32)}
 	go h.writePump(client)
 	defer func() {
@@ -43,6 +46,7 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 	for {
 		var msg Message
 		if err := c.ReadJSON(&msg); err != nil {
+			log.Printf("signal: read message error room=%s id=%s: %v", client.room, client.id, err)
 			break
 		}
 		switch msg.Type {
@@ -54,6 +58,8 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 			h.removeClient(client)
 		case "offer", "answer", "candidate":
 			h.forward(msg)
+		default:
+			log.Printf("signal: unknown msg type=%s room=%s from=%s", msg.Type, msg.Room, msg.From)
 		}
 	}
 }
@@ -70,6 +76,7 @@ func (h *Hub) addClient(c *Client) {
 		h.rooms[c.room] = m
 	}
 	m[c.id] = c
+	log.Printf("signal: join room=%s id=%s", c.room, c.id)
 }
 
 func (h *Hub) removeClient(c *Client) {
@@ -85,6 +92,7 @@ func (h *Hub) removeClient(c *Client) {
 		}
 		if len(m) == 0 {
 			delete(h.rooms, c.room)
+			log.Printf("signal: room %s closed", c.room)
 		}
 	}
 }
