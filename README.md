@@ -35,9 +35,11 @@ graph TD
 
 ### 前置要求
 
-- Windows 10/11
+- Windows 10/11、macOS 或主流 Linux 发行版
 - Go 1.22+ （推荐使用 `winget install -e --id GoLang.Go` 安装）
 - 浏览器：Chrome / Edge / Firefox 最新版
+
+> 下方命令示例使用 PowerShell，其他平台可使用等价的 shell 命令。
 
 ### 克隆项目
 
@@ -75,9 +77,21 @@ go run ./cmd/server
 
 > 提示：若在同一台机器打开两个窗口但无法互通，请先关闭 `HTTPS-Only` 模式或在隐身窗口测试。
 
+## 配置
+
+默认情况下，信令服务只允许本地开发来源（`localhost` / `127.0.0.1`）。  
+如需在其他域名下访问，可以设置环境变量 `WS_ALLOWED_ORIGINS`，例如：
+
+```powershell
+$env:WS_ALLOWED_ORIGINS="https://example.com,https://foo.bar"
+go run ./cmd/server
+```
+
+在生产环境中请根据实际域名进行配置。
+
 ## 文档
 
-- [docs/README.md](docs/README.md)：项目整体技术说明（架构、前端、媒体、录制等）。
+- [docs/guide.md](docs/guide.md)：项目整体技术说明（架构、前端、媒体、录制等）。
 - [docs/signaling.md](docs/signaling.md)：信令与房间管理的深入讲解。
 
 ## 项目结构
@@ -92,7 +106,7 @@ WebRTC/
 │   ├── index.html     # 浏览器端 UI
 │   └── app.js         # WebRTC & WS 信令逻辑
 ├── docs/
-│   ├── README.md      # 项目技术说明（学习向）
+│   ├── guide.md       # 项目技术说明（学习向）
 │   └── signaling.md   # 信令与房间管理详解
 ├── go.mod
 ├── .gitignore

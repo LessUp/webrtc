@@ -1,3 +1,4 @@
+ (function () {
  const myId = Math.random().toString(36).slice(2,10)
 const idEl = document.getElementById('myId')
 idEl.textContent = myId

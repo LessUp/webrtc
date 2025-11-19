@@ -3,6 +3,9 @@ package signal
 import (
 	"log"
 	"net/http"
+	"net/url"
+	"os"
+	"strings"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -21,11 +24,67 @@ type Client struct {
 	send chan Message
 }
 
+var (
+	allowedOrigins  []string
+	allowAllOrigins bool
+)
+
+func init() {
+	v := os.Getenv("WS_ALLOWED_ORIGINS")
+	if v == "" {
+		return
+	}
+	if v == "*" {
+		allowAllOrigins = true
+		return
+	}
+	parts := strings.Split(v, ",")
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			allowedOrigins = append(allowedOrigins, p)
+		}
+	}
+}
+
+func isOriginAllowed(r *http.Request) bool {
+	if allowAllOrigins {
+		return true
+	}
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		host := r.Host
+		if host == "localhost:8080" || strings.HasPrefix(host, "127.0.0.1:") || strings.HasPrefix(host, "localhost:") {
+			return true
+		}
+		return false
+	}
+	if len(allowedOrigins) == 0 {
+		u, err := url.Parse(origin)
+		if err != nil {
+			return false
+		}
+		host := u.Hostname()
+		if host == "localhost" || host == "127.0.0.1" {
+			return true
+		}
+		return false
+	}
+	for _, o := range allowedOrigins {
+		if o == origin {
+			return true
+		}
+	}
+	return false
+}
+
 func NewHub() *Hub {
 	return &Hub{
 		rooms: make(map[string]map[string]*Client),
 		upg: websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool { return true },
+			CheckOrigin: func(r *http.Request) bool {
+				return isOriginAllowed(r)
+			},
 		},
 	}
 }
@@ -150,6 +209,7 @@ func (h *Hub) forward(msg Message) {
 func (h *Hub) writePump(c *Client) {
 	for msg := range c.send {
 		if err := c.conn.WriteJSON(msg); err != nil {
+			log.Printf("signal: write message error room=%s id=%s: %v", c.room, c.id, err)
 			break
 		}
 	}

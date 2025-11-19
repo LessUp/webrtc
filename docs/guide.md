@@ -55,7 +55,7 @@ graph TD
 
   subgraph Server[Go 后端]
     HTTP[HTTP 静态文件]
-    WS[/ws WebSocket]
+    WS["/ws WebSocket"]
     HUB[Signal Hub]
   end
 
