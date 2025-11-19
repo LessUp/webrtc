@@ -14,21 +14,21 @@ WebRTC 是一个基于 Go 的最小可用 WebRTC 示例项目，提供 WebSocket
 ```mermaid
 graph TD
   subgraph Browser[浏览器]
-    UI[HTML UI]
-    JS[app.js]
+    UI["HTML UI"]
+    JS["app.js"]
   end
 
   subgraph Server[Go 后端]
-    HTTP[HTTP 静态文件]
-    WS[/ws WebSocket]
-    HUB[Signal Hub]
+    HTTP["HTTP 静态文件"]
+    WS["/ws WebSocket"]
+    HUB["Signal Hub"]
   end
 
   UI --> JS
-  JS -- HTTP GET / --> HTTP
-  JS -- WebSocket /ws --> WS
+  JS -- "HTTP GET /" --> HTTP
+  JS -- "WebSocket /ws" --> WS
   WS --> HUB
-  JS -- WebRTC 媒体/数据通道 --> JS2[远端浏览器]
+  JS -- "WebRTC 媒体/数据通道" --> JS2["远端浏览器"]
 ```
 
 ## 快速开始
