@@ -77,6 +77,24 @@ func (h *Hub) addClient(c *Client) {
 	}
 	m[c.id] = c
 	log.Printf("signal: join room=%s id=%s", c.room, c.id)
+
+	members := make([]string, 0, len(m))
+	for id := range m {
+		members = append(members, id)
+	}
+	msg := Message{
+		Type:    "room_members",
+		Room:    c.room,
+		Members: members,
+	}
+	for _, cli := range m {
+		if cli != nil && cli.conn != nil {
+			select {
+			case cli.send <- msg:
+			default:
+			}
+		}
+	}
 }
 
 func (h *Hub) removeClient(c *Client) {
@@ -93,6 +111,24 @@ func (h *Hub) removeClient(c *Client) {
 		if len(m) == 0 {
 			delete(h.rooms, c.room)
 			log.Printf("signal: room %s closed", c.room)
+		} else {
+			members := make([]string, 0, len(m))
+			for id := range m {
+				members = append(members, id)
+			}
+			msg := Message{
+				Type:    "room_members",
+				Room:    c.room,
+				Members: members,
+			}
+			for _, cli := range m {
+				if cli != nil && cli.conn != nil {
+					select {
+					case cli.send <- msg:
+					default:
+					}
+				}
+			}
 		}
 	}
 }

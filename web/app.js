@@ -12,6 +12,7 @@ let dataChannel
 const statusEl = document.getElementById('status')
 const errorEl = document.getElementById('error')
 const chatLog = document.getElementById('chatLog')
+const membersEl = document.getElementById('members')
 const chatInput = document.getElementById('chatInput')
 const chatSend = document.getElementById('chatSend')
 let state = 'idle'
@@ -49,6 +50,28 @@ function appendChat(text) {
   div.textContent = text
   chatLog.appendChild(div)
   chatLog.scrollTop = chatLog.scrollHeight
+}
+
+function renderMembers(list) {
+  if (!membersEl) return
+  membersEl.innerHTML = ''
+  if (!list || !list.length) {
+    membersEl.textContent = 'Members: (none)'
+    return
+  }
+  const label = document.createElement('span')
+  label.textContent = 'Members: '
+  membersEl.appendChild(label)
+  list.forEach(id => {
+    const btn = document.createElement('button')
+    btn.textContent = id === myId ? id + ' (you)' : id
+    btn.onclick = () => {
+      if (id === myId) return
+      const remoteInput = document.getElementById('remote')
+      if (remoteInput) remoteInput.value = id
+    }
+    membersEl.appendChild(btn)
+  })
 }
 
 function setupDataChannel(dc) {
@@ -172,6 +195,9 @@ function connectWS() {
       if (pc && msg.candidate) {
         try { await pc.addIceCandidate(msg.candidate) } catch {}
       }
+    } else if (msg.type === 'room_members') {
+      const list = msg.members || []
+      renderMembers(list)
     }
   }
   ws.onerror = (e) => {
@@ -181,6 +207,7 @@ function connectWS() {
   ws.onclose = () => {
     setError('信令服务器连接已关闭')
     setState('idle')
+    renderMembers([])
   }
 }
 

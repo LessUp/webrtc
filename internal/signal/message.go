@@ -9,4 +9,5 @@ type Message struct {
 	To        string          `json:"to,omitempty"`
 	SDP       json.RawMessage `json:"sdp,omitempty"`
 	Candidate json.RawMessage `json:"candidate,omitempty"`
+	Members   []string        `json:"members,omitempty"`
 }
