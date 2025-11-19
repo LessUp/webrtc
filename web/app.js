@@ -19,6 +19,8 @@ let muted = false
 let cameraOff = false
 let screenStream
 let usingScreen = false
+let recorder
+let recordedChunks = []
 
 function setError(msg) {
   if (!errorEl) return
@@ -75,6 +77,73 @@ async function getMedia() {
       setError('无法获取摄像头/麦克风：' + (err.message || err.name || '未知错误'))
       throw err
     }
+  }
+}
+
+const recStart = document.getElementById('recStart')
+const recStop = document.getElementById('recStop')
+
+if (recStop) {
+  recStop.disabled = true
+}
+
+if (recStart) {
+  recStart.onclick = () => {
+    if (recorder && recorder.state && recorder.state !== 'inactive') {
+      return
+    }
+    const stream = getRecordStream()
+    if (!stream) {
+      setError('没有可录制的媒体流')
+      return
+    }
+    recordedChunks = []
+    try {
+      recorder = new MediaRecorder(stream)
+    } catch (err) {
+      console.error(err)
+      setError('创建录制器失败：' + (err.message || err.name || '未知错误'))
+      return
+    }
+    recorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) recordedChunks.push(e.data)
+    }
+    recorder.onerror = (e) => {
+      const err = e.error || e
+      console.error('recorder error', err)
+      setError('录制出错：' + (err.message || err.name || '未知错误'))
+    }
+    recorder.onstop = () => {
+      if (!recordedChunks.length) {
+        if (recStart) recStart.disabled = false
+        if (recStop) recStop.disabled = true
+        return
+      }
+      const blob = new Blob(recordedChunks, { type: 'video/webm' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'webrtc-recording.webm'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      recorder = null
+      recordedChunks = []
+      if (recStart) recStart.disabled = false
+      if (recStop) recStop.disabled = true
+    }
+    setError('')
+    recorder.start()
+    recStart.disabled = true
+    if (recStop) recStop.disabled = false
+  }
+}
+
+if (recStop) {
+  recStop.onclick = () => {
+    if (!recorder || recorder.state === 'inactive') return
+    recorder.stop()
   }
 }
 
@@ -154,6 +223,14 @@ function stopScreenShare() {
   usingScreen = false
   const btn = document.getElementById('screenBtn')
   if (btn) btn.textContent = 'Share Screen'
+}
+
+function getRecordStream() {
+  const remoteVideo = document.getElementById('remoteVideo')
+  const remoteStream = remoteVideo && remoteVideo.srcObject
+  if (remoteStream) return remoteStream
+  if (localStream) return localStream
+  return null
 }
 
 function send(obj) {
