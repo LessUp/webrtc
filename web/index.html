@@ -11,19 +11,25 @@ input,button{margin:4px}
 .row{margin:8px 0}
 </style>
 </head>
-<body>
-<div class="row">
-<label>Room</label>
-<input id="room" placeholder="room">
-<button id="join">Join</button>
-</div>
-<div class="row">
-<div>Your ID: <span id="myId"></span></div>
-<label>Remote ID</label>
-<input id="remote" placeholder="peer id">
-<button id="call">Call</button>
-<button id="hangup">Hangup</button>
-</div>
+ <body>
+ <div class="row">
+ <label>Room</label>
+ <input id="room" placeholder="room">
+ <button id="join">Join</button>
+ </div>
+ <div class="row">
+ <div id="status">未连接</div>
+ </div>
+ <div class="row">
+ <div id="error" style="color:#c00;"></div>
+ </div>
+ <div class="row">
+ <div>Your ID: <span id="myId"></span></div>
+ <label>Remote ID</label>
+ <input id="remote" placeholder="peer id">
+ <button id="call">Call</button>
+ <button id="hangup">Hangup</button>
+ </div>
 <div class="row">
 <video id="local" autoplay playsinline muted></video>
 <video id="remoteVideo" autoplay playsinline></video>
