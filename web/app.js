@@ -1,20 +1,24 @@
  const myId = Math.random().toString(36).slice(2,10)
- const idEl = document.getElementById('myId')
- idEl.textContent = myId
+const idEl = document.getElementById('myId')
+idEl.textContent = myId
 
- let ws
- let pc
- let localStream
- let roomId
- let remoteId
+let ws
+let pc
+let localStream
+let roomId
+let remoteId
+let dataChannel
 
- const statusEl = document.getElementById('status')
- const errorEl = document.getElementById('error')
- let state = 'idle'
- let muted = false
- let cameraOff = false
- let screenStream
- let usingScreen = false
+const statusEl = document.getElementById('status')
+const errorEl = document.getElementById('error')
+const chatLog = document.getElementById('chatLog')
+const chatInput = document.getElementById('chatInput')
+const chatSend = document.getElementById('chatSend')
+let state = 'idle'
+let muted = false
+let cameraOff = false
+let screenStream
+let usingScreen = false
 
 function setError(msg) {
   if (!errorEl) return
@@ -34,6 +38,27 @@ function setState(newState) {
     joinBtn.disabled = state !== 'idle'
     callBtn.disabled = state !== 'joined'
     hangupBtn.disabled = state !== 'calling'
+  }
+}
+
+function appendChat(text) {
+  if (!chatLog) return
+  const div = document.createElement('div')
+  div.textContent = text
+  chatLog.appendChild(div)
+  chatLog.scrollTop = chatLog.scrollHeight
+}
+
+function setupDataChannel(dc) {
+  dataChannel = dc
+  dc.onopen = () => {
+    appendChat('[system] chat channel opened')
+  }
+  dc.onmessage = (e) => {
+    appendChat('peer: ' + e.data)
+  }
+  dc.onclose = () => {
+    appendChat('[system] chat channel closed')
   }
 }
 
@@ -100,6 +125,9 @@ async function ensurePC(target) {
   pc.ontrack = (e) => {
     document.getElementById('remoteVideo').srcObject = e.streams[0]
   }
+  pc.ondatachannel = (e) => {
+    setupDataChannel(e.channel)
+  }
   await getMedia()
   localStream.getTracks().forEach(t => pc.addTrack(t, localStream))
 }
@@ -152,6 +180,10 @@ callBtn.onclick = async () => {
   const id = document.getElementById('remote').value.trim()
   if (!id || !roomId) return
   await ensurePC(id)
+  if (!dataChannel) {
+    const dc = pc.createDataChannel('chat')
+    setupDataChannel(dc)
+  }
   const offer = await pc.createOffer()
   await pc.setLocalDescription(offer)
   send({ type: 'offer', room: roomId, from: myId, to: id, sdp: pc.localDescription })
