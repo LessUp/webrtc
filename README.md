@@ -9,6 +9,28 @@ WebRTC 是一个基于 Go 的最小可用 WebRTC 示例项目，提供 WebSocket
 - ⚙️ Go Modules 管理依赖，便于扩展与部署。
 - 🔄 可扩展架构：可进一步接入 TURN/SFU/录制等能力。
 
+## 架构总览
+
+```mermaid
+graph TD
+  subgraph Browser[浏览器]
+    UI[HTML UI]
+    JS[app.js]
+  end
+
+  subgraph Server[Go 后端]
+    HTTP[HTTP 静态文件]
+    WS[/ws WebSocket]
+    HUB[Signal Hub]
+  end
+
+  UI --> JS
+  JS -- HTTP GET / --> HTTP
+  JS -- WebSocket /ws --> WS
+  WS --> HUB
+  JS -- WebRTC 媒体/数据通道 --> JS2[远端浏览器]
+```
+
 ## 快速开始
 
 ### 前置要求
@@ -53,6 +75,11 @@ go run ./cmd/server
 
 > 提示：若在同一台机器打开两个窗口但无法互通，请先关闭 `HTTPS-Only` 模式或在隐身窗口测试。
 
+## 文档
+
+- [docs/README.md](docs/README.md)：项目整体技术说明（架构、前端、媒体、录制等）。
+- [docs/signaling.md](docs/signaling.md)：信令与房间管理的深入讲解。
+
 ## 项目结构
 
 ```
@@ -64,6 +91,9 @@ WebRTC/
 ├── web/
 │   ├── index.html     # 浏览器端 UI
 │   └── app.js         # WebRTC & WS 信令逻辑
+├── docs/
+│   ├── README.md      # 项目技术说明（学习向）
+│   └── signaling.md   # 信令与房间管理详解
 ├── go.mod
 ├── .gitignore
 ├── .gitattributes
