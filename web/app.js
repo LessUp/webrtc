@@ -369,5 +369,5 @@ if (screenBtn) {
     }
   }
 }
-
 setState('idle')
+})();
