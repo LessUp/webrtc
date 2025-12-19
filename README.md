@@ -79,11 +79,22 @@ go run ./cmd/server
 
 ## 配置
 
+可以通过环境变量调整服务监听地址：
+
+- `ADDR`：HTTP 服务监听地址（默认 `:8080`）。
+
 默认情况下，信令服务只允许本地开发来源（`localhost` / `127.0.0.1`）。  
 如需在其他域名下访问，可以设置环境变量 `WS_ALLOWED_ORIGINS`，例如：
 
 ```powershell
 $env:WS_ALLOWED_ORIGINS="https://example.com,https://foo.bar"
+go run ./cmd/server
+```
+
+如需临时允许所有来源（不推荐用于生产环境），可设置：
+
+```powershell
+$env:WS_ALLOWED_ORIGINS="*"
 go run ./cmd/server
 ```
 

@@ -1,0 +1,341 @@
+:root {
+  --radius: 14px;
+
+  --bg: #f6f7fb;
+  --card-bg: #ffffff;
+  --text: #111827;
+  --muted: #6b7280;
+  --border: rgba(17, 24, 39, 0.12);
+  --shadow: 0 10px 30px rgba(17, 24, 39, 0.06);
+
+  --input-bg: rgba(17, 24, 39, 0.03);
+  --button-bg: #ffffff;
+  --button-hover: rgba(17, 24, 39, 0.06);
+  --chip-bg: rgba(17, 24, 39, 0.04);
+  --chip-hover: rgba(17, 24, 39, 0.07);
+  --video-bg: rgba(17, 24, 39, 0.02);
+
+  --focus: #2563eb;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --success: #16a34a;
+  --danger: #dc2626;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1220;
+    --card-bg: rgba(255, 255, 255, 0.06);
+    --text: #e5e7eb;
+    --muted: rgba(229, 231, 235, 0.72);
+    --border: rgba(229, 231, 235, 0.14);
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+
+    --input-bg: rgba(255, 255, 255, 0.06);
+    --button-bg: rgba(255, 255, 255, 0.06);
+    --button-hover: rgba(255, 255, 255, 0.1);
+    --chip-bg: rgba(255, 255, 255, 0.08);
+    --chip-hover: rgba(255, 255, 255, 0.12);
+    --video-bg: rgba(255, 255, 255, 0.05);
+
+    --focus: #60a5fa;
+    --primary: #3b82f6;
+    --primary-hover: #2563eb;
+    --success: #22c55e;
+    --danger: #ef4444;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
+    Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  background: radial-gradient(1000px 600px at 20% -10%, rgba(37, 99, 235, 0.18), transparent 60%),
+    radial-gradient(900px 500px at 90% 10%, rgba(34, 197, 94, 0.14), transparent 55%),
+    var(--bg);
+  color: var(--text);
+}
+
+.app {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 24px 16px 32px;
+}
+
+.app__header {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.brand__title {
+  font-size: 22px;
+  font-weight: 750;
+  letter-spacing: 0.2px;
+}
+
+.brand__subtitle {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.status {
+  text-align: right;
+  max-width: 420px;
+}
+
+.status__text {
+  display: inline-block;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--chip-bg);
+  font-weight: 650;
+}
+
+.status__error {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--danger);
+  min-height: 18px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 980px) {
+  .grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .card--full {
+    grid-column: 1 / -1;
+  }
+}
+
+.card {
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  box-shadow: var(--shadow);
+  padding: 16px;
+  backdrop-filter: blur(10px);
+}
+
+.card__title {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+.form-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.label {
+  font-size: 13px;
+  color: var(--muted);
+  min-width: 64px;
+}
+
+.input {
+  flex: 1 1 220px;
+  min-width: 180px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--text);
+  outline: none;
+}
+
+.input:focus {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.25);
+}
+
+.button {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--button-bg);
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.06s ease, background 0.15s ease, border-color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.button:hover {
+  background: var(--button-hover);
+}
+
+.button:active {
+  transform: translateY(1px);
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.button--primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+}
+
+.button--primary:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+
+.button--success {
+  background: var(--success);
+  border-color: var(--success);
+  color: #ffffff;
+}
+
+.button--danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #ffffff;
+}
+
+.controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.pill {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--chip-bg);
+  font-size: 12px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.members {
+  margin-top: 12px;
+}
+
+.members__title {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.members__list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.member-pill {
+  border: 1px solid var(--border);
+  background: var(--chip-bg);
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.member-pill:hover {
+  background: var(--chip-hover);
+}
+
+.videos {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+@media (min-width: 640px) {
+  .videos {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.video-tile {
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--video-bg);
+  overflow: hidden;
+}
+
+.video-tile__label {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.video-tile video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000000;
+  display: block;
+}
+
+.chat-log {
+  height: 160px;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--input-bg);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.chat-log > div {
+  padding: 4px 0;
+  border-bottom: 1px dashed rgba(107, 114, 128, 0.35);
+}
+
+.chat-log > div:last-child {
+  border-bottom: none;
+}
+
+.chat-input {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.footer {
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: 12px;
+}

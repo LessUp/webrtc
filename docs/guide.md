@@ -104,6 +104,7 @@ type Message struct {
 - `Hub`：
   - `rooms map[string]map[string]*Client`：`房间名 -> (客户端 ID -> Client)`。
   - `upg websocket.Upgrader`：升级 HTTP 为 WebSocket。
+  - `allowedOrigins` / `allowAllOrigins`：WebSocket `Origin` 校验配置（由服务入口解析 `WS_ALLOWED_ORIGINS` 并通过 `signal.Options` 注入）。
 
 - `Client`：
   - `id`：客户端 ID（由前端生成，例如随机字符串）。

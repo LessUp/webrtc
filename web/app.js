@@ -4,6 +4,7 @@ const idEl = document.getElementById('myId')
 idEl.textContent = myId
 
 let ws
+let manualClose = false
 let pc
 let localStream
 let roomId
@@ -16,6 +17,15 @@ const chatLog = document.getElementById('chatLog')
 const membersEl = document.getElementById('members')
 const chatInput = document.getElementById('chatInput')
 const chatSend = document.getElementById('chatSend')
+
+const roomInput = document.getElementById('room')
+const remoteInput = document.getElementById('remote')
+const localVideo = document.getElementById('local')
+const remoteVideo = document.getElementById('remoteVideo')
+const joinBtn = document.getElementById('join')
+const callBtn = document.getElementById('call')
+const hangupBtn = document.getElementById('hangup')
+
 let state = 'idle'
 let muted = false
 let cameraOff = false
@@ -38,9 +48,20 @@ function setState(newState) {
     else if (state === 'ended') text = '通话已结束'
     statusEl.textContent = text
   }
-  if (typeof joinBtn !== 'undefined' && typeof callBtn !== 'undefined' && typeof hangupBtn !== 'undefined') {
-    joinBtn.disabled = state !== 'idle'
+  if (joinBtn) {
+    joinBtn.textContent = state === 'idle' ? 'Join' : 'Leave'
+    joinBtn.disabled = state === 'calling'
+  }
+  if (roomInput) {
+    roomInput.disabled = state !== 'idle'
+  }
+  if (remoteInput) {
+    remoteInput.disabled = state !== 'joined'
+  }
+  if (callBtn) {
     callBtn.disabled = state !== 'joined'
+  }
+  if (hangupBtn) {
     hangupBtn.disabled = state !== 'calling'
   }
 }
@@ -57,19 +78,25 @@ function renderMembers(list) {
   if (!membersEl) return
   membersEl.innerHTML = ''
   if (!list || !list.length) {
-    membersEl.textContent = 'Members: (none)'
+    const span = document.createElement('span')
+    span.className = 'muted'
+    span.textContent = '暂无成员'
+    membersEl.appendChild(span)
     return
   }
-  const label = document.createElement('span')
-  label.textContent = 'Members: '
-  membersEl.appendChild(label)
   list.forEach(id => {
     const btn = document.createElement('button')
-    btn.textContent = id === myId ? id + ' (you)' : id
-    btn.onclick = () => {
-      if (id === myId) return
-      const remoteInput = document.getElementById('remote')
-      if (remoteInput) remoteInput.value = id
+    btn.type = 'button'
+    btn.className = 'member-pill'
+    if (id === myId) {
+      btn.textContent = id + ' (你)'
+      btn.disabled = true
+    } else {
+      btn.textContent = id
+      btn.onclick = () => {
+        if (!remoteInput) return
+        remoteInput.value = id
+      }
     }
     membersEl.appendChild(btn)
   })
@@ -88,13 +115,40 @@ function setupDataChannel(dc) {
   }
 }
 
+function sendChat() {
+  if (!chatInput) return
+  const text = chatInput.value.trim()
+  if (!text) return
+  if (!dataChannel || dataChannel.readyState !== 'open') {
+    setError('聊天通道未建立（请先 Call）')
+    return
+  }
+  setError('')
+  dataChannel.send(text)
+  appendChat('me: ' + text)
+  chatInput.value = ''
+}
+
+if (chatSend) {
+  chatSend.onclick = sendChat
+}
+
+if (chatInput) {
+  chatInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      sendChat()
+    }
+  })
+}
+
 const servers = { iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }] }
 
 async function getMedia() {
   if (!localStream) {
     try {
       localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
-      document.getElementById('local').srcObject = localStream
+      if (localVideo) localVideo.srcObject = localStream
       setError('')
     } catch (err) {
       console.error(err)
@@ -172,7 +226,7 @@ if (recStop) {
 }
 
 function connectWS() {
-  if (ws && ws.readyState === WebSocket.OPEN) return
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return
   const proto = location.protocol === 'https:' ? 'wss://' : 'ws://'
   ws = new WebSocket(proto + location.host + '/ws')
   ws.onopen = () => {
@@ -184,10 +238,12 @@ function connectWS() {
     const msg = JSON.parse(ev.data)
     if (msg.type === 'offer') {
       await ensurePC(msg.from)
+      if (remoteInput) remoteInput.value = msg.from || ''
       await pc.setRemoteDescription(msg.sdp)
       const answer = await pc.createAnswer()
       await pc.setLocalDescription(answer)
       send({ type: 'answer', room: roomId, from: myId, to: msg.from, sdp: pc.localDescription })
+      setState('calling')
     } else if (msg.type === 'answer') {
       if (pc) {
         await pc.setRemoteDescription(msg.sdp)
@@ -206,7 +262,16 @@ function connectWS() {
     setError('信令服务器连接出错')
   }
   ws.onclose = () => {
-    setError('信令服务器连接已关闭')
+    ws = null
+    closePeerConnection()
+    roomId = null
+    if (remoteInput) remoteInput.value = ''
+    if (manualClose) {
+      manualClose = false
+      setError('')
+    } else {
+      setError('信令服务器连接已关闭')
+    }
     setState('idle')
     renderMembers([])
   }
@@ -220,24 +285,80 @@ async function ensurePC(target) {
     if (e.candidate) send({ type: 'candidate', room: roomId, from: myId, to: remoteId, candidate: e.candidate })
   }
   pc.ontrack = (e) => {
-    document.getElementById('remoteVideo').srcObject = e.streams[0]
+    if (remoteVideo) remoteVideo.srcObject = e.streams[0]
   }
   pc.ondatachannel = (e) => {
     setupDataChannel(e.channel)
   }
   await getMedia()
   localStream.getTracks().forEach(t => pc.addTrack(t, localStream))
+  if (usingScreen && screenStream) {
+    const track = screenStream.getVideoTracks()[0]
+    if (track) {
+      const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video')
+      if (sender) {
+        sender.replaceTrack(track).catch(() => {})
+      }
+    }
+  }
+}
+
+function closePeerConnection() {
+  if (dataChannel) {
+    try { dataChannel.close() } catch {}
+  }
+  dataChannel = null
+  remoteId = null
+  if (pc) {
+    try { pc.close() } catch {}
+    pc = null
+  }
+  if (remoteVideo) remoteVideo.srcObject = null
+}
+
+function stopLocalMedia() {
+  if (localStream) {
+    localStream.getTracks().forEach(t => { try { t.stop() } catch {} })
+    localStream = null
+  }
+  if (localVideo) localVideo.srcObject = null
+  muted = false
+  cameraOff = false
+  const muteButton = document.getElementById('muteBtn')
+  if (muteButton) muteButton.textContent = 'Mute'
+  const cameraButton = document.getElementById('cameraBtn')
+  if (cameraButton) cameraButton.textContent = 'Camera Off'
+}
+
+function leaveRoom() {
+  closePeerConnection()
+  if (usingScreen) {
+    stopScreenShare()
+  }
+  stopLocalMedia()
+  renderMembers([])
+  if (remoteInput) remoteInput.value = ''
+  setError('')
+  if (ws) {
+    try {
+      manualClose = true
+      ws.send(JSON.stringify({ type: 'leave', room: roomId, from: myId }))
+    } catch {}
+    try { ws.close() } catch {}
+  }
+  ws = null
+  roomId = null
+  setState('idle')
 }
 
 function stopScreenShare() {
   if (!usingScreen) return
-  const localVideo = document.getElementById('local')
   if (screenStream) {
     screenStream.getTracks().forEach(t => { try { t.stop() } catch {} })
     screenStream = null
   }
   if (localStream) {
-    localVideo.srcObject = localStream
+    if (localVideo) localVideo.srcObject = localStream
     const cameraTrack = localStream.getVideoTracks()[0]
     if (pc && cameraTrack) {
       const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video')
@@ -246,7 +367,7 @@ function stopScreenShare() {
       }
     }
   } else {
-    localVideo.srcObject = null
+    if (localVideo) localVideo.srcObject = null
   }
   usingScreen = false
   const btn = document.getElementById('screenBtn')
@@ -254,7 +375,6 @@ function stopScreenShare() {
 }
 
 function getRecordStream() {
-  const remoteVideo = document.getElementById('remoteVideo')
   const remoteStream = remoteVideo && remoteVideo.srcObject
   if (remoteStream) return remoteStream
   if (localStream) return localStream
@@ -267,23 +387,29 @@ function send(obj) {
   }
 }
 
-const joinBtn = document.getElementById('join')
 joinBtn.onclick = async () => {
-  roomId = document.getElementById('room').value.trim()
+  if (state !== 'idle') {
+    leaveRoom()
+    return
+  }
+  roomId = (roomInput ? roomInput.value : '').trim()
   if (!roomId) return
-  connectWS()
   try {
     await getMedia()
   } catch {
     // error already handled in getMedia
     return
   }
+  connectWS()
 }
 
-const callBtn = document.getElementById('call')
 callBtn.onclick = async () => {
-  const id = document.getElementById('remote').value.trim()
+  const id = (remoteInput ? remoteInput.value : '').trim()
   if (!id || !roomId) return
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    setError('信令服务器未连接')
+    return
+  }
   await ensurePC(id)
   if (!dataChannel) {
     const dc = pc.createDataChannel('chat')
@@ -295,14 +421,9 @@ callBtn.onclick = async () => {
   setState('calling')
 }
 
-const hangupBtn = document.getElementById('hangup')
 hangupBtn.onclick = () => {
-  if (pc) {
-    pc.getSenders().forEach(s => { try { s.track && s.track.stop() } catch {} })
-    pc.close()
-    pc = null
-  }
-  if (roomId) {
+  closePeerConnection()
+  if (roomId && ws && ws.readyState === WebSocket.OPEN) {
     setState('joined')
   } else {
     setState('idle')
@@ -348,8 +469,7 @@ if (screenBtn) {
         screenStream = stream
         usingScreen = true
         screenBtn.textContent = 'Stop Share'
-        const localVideo = document.getElementById('local')
-        localVideo.srcObject = screenStream
+        if (localVideo) localVideo.srcObject = screenStream
         if (pc) {
           const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video')
           if (sender) {

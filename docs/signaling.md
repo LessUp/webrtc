@@ -84,6 +84,9 @@ type Hub struct {
     mu    sync.RWMutex
     rooms map[string]map[string]*Client
     upg   websocket.Upgrader
+
+	allowedOrigins  []string
+	allowAllOrigins bool
 }
 
 type Client struct {
@@ -125,6 +128,7 @@ type Client struct {
   func (h *Hub) writePump(c *Client) {
       for msg := range c.send {
           if err := c.conn.WriteJSON(msg); err != nil {
+              c.conn.Close()
               break
           }
       }
@@ -147,7 +151,7 @@ type Client struct {
 func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
     c, err := h.upg.Upgrade(w, r, nil)
     if err != nil {
-        log.Printf("signal: ws upgrade failed from %s: %v", r.RemoteAddr, err)
+        log.Printf("signal: ws upgrade failed from %s path=%s: %v", r.RemoteAddr, r.URL.Path, err)
         return
     }
     log.Printf("signal: ws connected from %s", r.RemoteAddr)
@@ -155,6 +159,7 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
     go h.writePump(client)
     defer func() {
         h.removeClient(client)
+        close(client.send)
         c.Close()
     }()
     for {
@@ -188,6 +193,7 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 3. 启动 `writePump` 协程，负责异步写消息。
 4. 使用 `defer` 确保函数结束时：
    - 调用 `removeClient` 移除客户端；
+   - 关闭 `send` 通道，结束 `writePump` 写协程；
    - 关闭连接 `c.Close()`。
 
 ### 4.2 消息读取与分发

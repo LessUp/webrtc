@@ -4,7 +4,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 
@@ -15,6 +14,9 @@ type Hub struct {
 	mu    sync.RWMutex
 	rooms map[string]map[string]*Client
 	upg   websocket.Upgrader
+
+	allowedOrigins  []string
+	allowAllOrigins bool
 }
 
 type Client struct {
@@ -24,31 +26,31 @@ type Client struct {
 	send chan Message
 }
 
-var (
-	allowedOrigins  []string
-	allowAllOrigins bool
-)
-
-func init() {
-	v := os.Getenv("WS_ALLOWED_ORIGINS")
-	if v == "" {
-		return
-	}
-	if v == "*" {
-		allowAllOrigins = true
-		return
-	}
-	parts := strings.Split(v, ",")
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if p != "" {
-			allowedOrigins = append(allowedOrigins, p)
-		}
-	}
+type Options struct {
+	AllowedOrigins  []string
+	AllowAllOrigins bool
 }
 
-func isOriginAllowed(r *http.Request) bool {
-	if allowAllOrigins {
+func NewHub() *Hub {
+	return NewHubWithOptions(Options{})
+}
+
+func NewHubWithOptions(opts Options) *Hub {
+	h := &Hub{
+		rooms:           make(map[string]map[string]*Client),
+		allowedOrigins:  append([]string(nil), opts.AllowedOrigins...),
+		allowAllOrigins: opts.AllowAllOrigins,
+	}
+	h.upg = websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			return h.isOriginAllowed(r)
+		},
+	}
+	return h
+}
+
+func (h *Hub) isOriginAllowed(r *http.Request) bool {
+	if h.allowAllOrigins {
 		return true
 	}
 	origin := r.Header.Get("Origin")
@@ -59,7 +61,7 @@ func isOriginAllowed(r *http.Request) bool {
 		}
 		return false
 	}
-	if len(allowedOrigins) == 0 {
+	if len(h.allowedOrigins) == 0 {
 		u, err := url.Parse(origin)
 		if err != nil {
 			return false
@@ -70,7 +72,7 @@ func isOriginAllowed(r *http.Request) bool {
 		}
 		return false
 	}
-	for _, o := range allowedOrigins {
+	for _, o := range h.allowedOrigins {
 		if o == origin {
 			return true
 		}
@@ -78,21 +80,10 @@ func isOriginAllowed(r *http.Request) bool {
 	return false
 }
 
-func NewHub() *Hub {
-	return &Hub{
-		rooms: make(map[string]map[string]*Client),
-		upg: websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool {
-				return isOriginAllowed(r)
-			},
-		},
-	}
-}
-
 func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 	c, err := h.upg.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("signal: ws upgrade failed from %s: %v", r.RemoteAddr, err)
+		log.Printf("signal: ws upgrade failed from %s path=%s: %v", r.RemoteAddr, r.URL.Path, err)
 		return
 	}
 	log.Printf("signal: ws connected from %s", r.RemoteAddr)
@@ -100,6 +91,7 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 	go h.writePump(client)
 	defer func() {
 		h.removeClient(client)
+		close(client.send)
 		c.Close()
 	}()
 	for {
@@ -162,30 +154,34 @@ func (h *Hub) removeClient(c *Client) {
 	if c.room == "" || c.id == "" {
 		return
 	}
-	if m, ok := h.rooms[c.room]; ok {
-		if existing, ok2 := m[c.id]; ok2 {
-			delete(m, c.id)
-			close(existing.send)
+	room := c.room
+	if m, ok := h.rooms[room]; ok {
+		if _, ok2 := m[c.id]; !ok2 {
+			c.room = ""
+			return
 		}
+		delete(m, c.id)
+		c.room = ""
 		if len(m) == 0 {
-			delete(h.rooms, c.room)
-			log.Printf("signal: room %s closed", c.room)
-		} else {
-			members := make([]string, 0, len(m))
-			for id := range m {
-				members = append(members, id)
-			}
-			msg := Message{
-				Type:    "room_members",
-				Room:    c.room,
-				Members: members,
-			}
-			for _, cli := range m {
-				if cli != nil && cli.conn != nil {
-					select {
-					case cli.send <- msg:
-					default:
-					}
+			delete(h.rooms, room)
+			log.Printf("signal: room %s closed", room)
+			return
+		}
+
+		members := make([]string, 0, len(m))
+		for id := range m {
+			members = append(members, id)
+		}
+		msg := Message{
+			Type:    "room_members",
+			Room:    room,
+			Members: members,
+		}
+		for _, cli := range m {
+			if cli != nil && cli.conn != nil {
+				select {
+				case cli.send <- msg:
+				default:
 				}
 			}
 		}
@@ -210,6 +206,7 @@ func (h *Hub) writePump(c *Client) {
 	for msg := range c.send {
 		if err := c.conn.WriteJSON(msg); err != nil {
 			log.Printf("signal: write message error room=%s id=%s: %v", c.room, c.id, err)
+			c.conn.Close()
 			break
 		}
 	}
