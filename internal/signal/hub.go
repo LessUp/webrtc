@@ -107,6 +107,11 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 			h.addClient(client)
 		case "leave":
 			h.removeClient(client)
+		case "ping":
+			select {
+			case client.send <- Message{Type: "pong"}:
+			default:
+			}
 		case "offer", "answer", "candidate":
 			h.forward(msg)
 		default:

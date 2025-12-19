@@ -60,7 +60,9 @@ type Message struct {
   - `"leave"`：离开房间请求（当前 Demo 中暂时很少手动用到）；
   - `"offer"` / `"answer"`：SDP 交换；
   - `"candidate"`：ICE 候选；
-  - `"room_members"`：服务端广播的当前房间成员列表（从服务端发给前端）。
+  - `"room_members"`：服务端广播的当前房间成员列表（从服务端发给前端）；
+  - `"ping"`：可选心跳消息（从前端发给服务端，用于保活/学习）；
+  - `"pong"`：服务端对 `"ping"` 的可选回应（从服务端发给前端）。
 - `Room`：房间名，字符串。
 - `From`：发送方 ID（前端生成的 `myId`）。
 - `To`：接收方 ID，仅点对点消息（`offer/answer/candidate`）需要。
@@ -110,7 +112,7 @@ type Client struct {
   - `rooms["room1"]["userB"] = *Client`
 - 处理下列操作：
   - WebSocket 连接升级与关闭；
-  - 收到 `join/leave/offer/answer/candidate` 消息并处理；
+  - 收到 `join/leave/ping/offer/answer/candidate` 消息并处理；
   - 对 `offer/answer/candidate` 按 `Room + To` 进行转发；
   - 在房间成员变化时，广播 `room_members` 消息。
 
@@ -175,6 +177,11 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
             h.addClient(client)
         case "leave":
             h.removeClient(client)
+        case "ping":
+            select {
+            case client.send <- Message{Type: "pong"}:
+            default:
+            }
         case "offer", "answer", "candidate":
             h.forward(msg)
         default:
@@ -202,6 +209,7 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 - 根据 `msg.Type`：
   - `join`：设置 `client.id`/`client.room`，并调用 `addClient`；
   - `leave`：调用 `removeClient`；
+  - `ping`：可选心跳消息，服务端可回写 `pong`（非阻塞发送）；
   - `offer/answer/candidate`：调用 `forward(msg)`，根据房间和 `To` 转发；
   - 其他：打印未知类型日志。
 
@@ -268,30 +276,33 @@ func (h *Hub) removeClient(c *Client) {
     if c.room == "" || c.id == "" {
         return
     }
-    if m, ok := h.rooms[c.room]; ok {
-        if existing, ok2 := m[c.id]; ok2 {
-            delete(m, c.id)
-            close(existing.send)
+    room := c.room
+    if m, ok := h.rooms[room]; ok {
+        if _, ok2 := m[c.id]; !ok2 {
+            c.room = ""
+            return
         }
+        delete(m, c.id)
+        c.room = ""
         if len(m) == 0 {
-            delete(h.rooms, c.room)
-            log.Printf("signal: room %s closed", c.room)
-        } else {
-            members := make([]string, 0, len(m))
-            for id := range m {
-                members = append(members, id)
-            }
-            msg := Message{
-                Type:    "room_members",
-                Room:    c.room,
-                Members: members,
-            }
-            for _, cli := range m {
-                if cli != nil && cli.conn != nil {
-                    select {
-                    case cli.send <- msg:
-                    default:
-                    }
+            delete(h.rooms, room)
+            log.Printf("signal: room %s closed", room)
+            return
+        }
+        members := make([]string, 0, len(m))
+        for id := range m {
+            members = append(members, id)
+        }
+        msg := Message{
+            Type:    "room_members",
+            Room:    room,
+            Members: members,
+        }
+        for _, cli := range m {
+            if cli != nil && cli.conn != nil {
+                select {
+                case cli.send <- msg:
+                default:
                 }
             }
         }
@@ -302,10 +313,11 @@ func (h *Hub) removeClient(c *Client) {
 关键点：
 
 - 同样通过互斥锁保护 `rooms`；
-- 找到 `rooms[c.room]` 后：
-  - 删除对应 `id`，并关闭其 `send` 通道；
+- 找到 `rooms[room]` 后：
+  - 删除对应 `id`（这里不关闭 `send` 通道，`send` 在 `HandleWS` 的 `defer` 中统一关闭，以结束 `writePump`）；
   - 若该房间已空，删除房间并打印“room closed”；
   - 若仍有其他成员：重新构建成员列表，广播 `room_members` 给房间内剩余成员。
+- 离开后将 `c.room` 置空，避免同一连接在 `leave` 后被 `defer` 再次 `removeClient` 时重复处理。
 
 > 注意：
 > - 这里使用 `select { case cli.send <- msg: default: }` 非阻塞发送，避免因为某个客户端处理过慢而卡住整个 Hub。

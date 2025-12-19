@@ -5,6 +5,7 @@ idEl.textContent = myId
 
 let ws
 let manualClose = false
+let pingTimer = null
 let pc
 let localStream
 let roomId
@@ -143,6 +144,22 @@ if (chatInput) {
 }
 
 const servers = { iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }] }
+const pingIntervalMs = 25000
+
+function startPing() {
+  stopPing()
+  pingTimer = setInterval(() => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'ping', room: roomId, from: myId }))
+    }
+  }, pingIntervalMs)
+}
+
+function stopPing() {
+  if (!pingTimer) return
+  clearInterval(pingTimer)
+  pingTimer = null
+}
 
 async function getMedia() {
   if (!localStream) {
@@ -233,6 +250,7 @@ function connectWS() {
     setError('')
     ws.send(JSON.stringify({ type: 'join', room: roomId, from: myId }))
     setState('joined')
+    startPing()
   }
   ws.onmessage = async (ev) => {
     const msg = JSON.parse(ev.data)
@@ -255,6 +273,10 @@ function connectWS() {
     } else if (msg.type === 'room_members') {
       const list = msg.members || []
       renderMembers(list)
+      if (state === 'joined' && remoteInput && !remoteInput.value.trim()) {
+        const peer = list.find(id => id && id !== myId)
+        if (peer) remoteInput.value = peer
+      }
     }
   }
   ws.onerror = (e) => {
@@ -262,6 +284,7 @@ function connectWS() {
     setError('信令服务器连接出错')
   }
   ws.onclose = () => {
+    stopPing()
     ws = null
     closePeerConnection()
     roomId = null
@@ -339,6 +362,7 @@ function leaveRoom() {
   renderMembers([])
   if (remoteInput) remoteInput.value = ''
   setError('')
+  stopPing()
   if (ws) {
     try {
       manualClose = true

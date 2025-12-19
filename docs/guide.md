@@ -97,6 +97,10 @@ type Message struct {
 - `candidate`：ICE 候选，帮助打洞。
 - `room_members`：服务器广播的“当前房间成员列表”。
 
+可选的辅助消息：
+
+- `ping` / `pong`：简单心跳（前端定时发送 `ping`，服务端可选回 `pong`），用于学习“保活”概念。
+
 ### 2.2 Hub 与 Client
 
 文件：`internal/signal/hub.go`
