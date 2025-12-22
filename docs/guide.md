@@ -168,10 +168,9 @@ sequenceDiagram
 - `state`：`'idle' | 'joined' | 'calling' | 'ended'`。
 - `roomId`：当前加入的房间名。
 - `myId`：本端随机生成 ID（在页面显示 `Your ID`）。
-- `remoteId`：准备呼叫的对端 ID（来自输入框或成员列表按钮）。
-- `pc`：当前使用的 `RTCPeerConnection`（一对一场景只有一个）。
+- `peers`：`peerId -> { pc, dc, remoteStream }` 的映射表，用于 Mesh 多人通话管理多条连接。
 - `localStream`：本地媒体流（摄像头 + 麦克风）。
-- `dataChannel`：文本聊天使用的 `RTCDataChannel`。
+- `screenStream` / `usingScreen`：屏幕共享状态（共享时会对所有 peer 执行 `replaceTrack`）。
 
 ### 3.2 状态机
 
@@ -192,7 +191,7 @@ stateDiagram-v2
 - 不同状态下按钮可用性：
   - `Idle`：只允许 `Join`；
   - `Joined`：允许 `Call`，`Hangup` 禁用；
-  - `Calling`：允许 `Hangup`；
+  - `Calling`：允许继续 `Call`（可对多个成员重复），允许 `Hangup`（结束所有连接但仍留在房间）；
   - `Ended`：可视为回到 `Joined` 或 `Idle`，本项目中挂断后回到 `Joined`（仍在房间）。
 
 ---
@@ -218,11 +217,12 @@ await getMedia()
 localStream.getTracks().forEach(t => pc.addTrack(t, localStream))
 ```
 
-- 这样对端在 `ontrack` 中就能拿到远端流并显示：
+- 多人场景下，每个 `peerId` 都会有独立的 `pc`；当收到远端媒体时，动态创建/找到对应的 `<video>` 并绑定：
 
 ```js
 pc.ontrack = (e) => {
-  document.getElementById('remoteVideo').srcObject = e.streams[0]
+  const video = ensureRemoteTile(peerId)
+  if (video) video.srcObject = e.streams[0]
 }
 ```
 
@@ -265,8 +265,10 @@ tracks.forEach(t => { t.enabled = !cameraOff })
 3. 若已建立 `pc`，找到现有发送视频的 `RTCRtpSender`，替换其中的 `track`：
 
    ```js
-   const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video')
-   await sender.replaceTrack(track)
+   for (const peer of peers.values()) {
+     const sender = peer.pc.getSenders().find(s => s.track && s.track.kind === 'video')
+     if (sender) await sender.replaceTrack(track)
+   }
    ```
 
 4. 当用户停止共享（浏览器自带“停止共享”按钮）：
@@ -284,17 +286,15 @@ tracks.forEach(t => { t.enabled = !cameraOff })
 - 呼叫方在 `Call` 时创建 DataChannel：
 
 ```js
-if (!dataChannel) {
-  const dc = pc.createDataChannel('chat')
-  setupDataChannel(dc)
-}
+const dc = peer.pc.createDataChannel('chat')
+setupDataChannel(peerId, dc)
 ```
 
 - 被叫方在 `pc.ondatachannel` 中接收：
 
 ```js
 pc.ondatachannel = (e) => {
-  setupDataChannel(e.channel)
+  setupDataChannel(peerId, e.channel)
 }
 ```
 
@@ -303,11 +303,12 @@ pc.ondatachannel = (e) => {
 `setupDataChannel` 中：
 
 ```js
-function setupDataChannel(dc) {
-  dataChannel = dc
-  dc.onopen = () => appendChat('[system] chat channel opened')
-  dc.onmessage = (e) => appendChat('peer: ' + e.data)
-  dc.onclose = () => appendChat('[system] chat channel closed')
+function setupDataChannel(peerId, dc) {
+  const peer = peers.get(peerId)
+  if (peer) peer.dc = dc
+  dc.onopen = () => appendChat('[system] chat channel opened: ' + peerId)
+  dc.onmessage = (e) => appendChat(peerId + ': ' + e.data)
+  dc.onclose = () => appendChat('[system] chat channel closed: ' + peerId)
 }
 ```
 
@@ -317,13 +318,17 @@ function setupDataChannel(dc) {
 
 ```js
 chatSend.onclick = () => {
-  if (!dataChannel || dataChannel.readyState !== 'open') {
-    setError('Chat channel is not open')
-    return
-  }
   const text = chatInput.value.trim()
   if (!text) return
-  dataChannel.send(text)
+  const channels = []
+  for (const peer of peers.values()) {
+    if (peer.dc && peer.dc.readyState === 'open') channels.push(peer.dc)
+  }
+  if (!channels.length) {
+    setError('聊天通道未建立（请先 Call）')
+    return
+  }
+  channels.forEach(dc => dc.send(text))
   appendChat('me: ' + text)
   chatInput.value = ''
 }
@@ -337,9 +342,10 @@ chatSend.onclick = () => {
 
 函数 `getRecordStream()`：
 
-1. 若 `remoteVideo.srcObject` 存在，优先录制远端流；
-2. 否则，如果有 `localStream`，录制本地流；
-3. 否则提示“没有可录制的媒体流”。
+1. 若存在任意 peer 的 `remoteStream`，优先录制远端流；
+2. 否则若正在屏幕共享，录制 `screenStream`；
+3. 否则，如果有 `localStream`，录制本地流；
+4. 否则提示“没有可录制的媒体流”。
 
 ### 6.2 使用 `MediaRecorder`
 

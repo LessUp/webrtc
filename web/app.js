@@ -1,39 +1,37 @@
  (function () {
- const myId = Math.random().toString(36).slice(2,10)
-const idEl = document.getElementById('myId')
-idEl.textContent = myId
+  const myId = Math.random().toString(36).slice(2,10)
+  const idEl = document.getElementById('myId')
+  idEl.textContent = myId
 
-let ws
-let manualClose = false
-let pingTimer = null
-let pc
-let localStream
-let roomId
-let remoteId
-let dataChannel
+  let ws
+  let manualClose = false
+  let pingTimer = null
+  let localStream
+  let roomId
+  const peers = new Map()
 
-const statusEl = document.getElementById('status')
-const errorEl = document.getElementById('error')
-const chatLog = document.getElementById('chatLog')
-const membersEl = document.getElementById('members')
-const chatInput = document.getElementById('chatInput')
-const chatSend = document.getElementById('chatSend')
+  const statusEl = document.getElementById('status')
+  const errorEl = document.getElementById('error')
+  const chatLog = document.getElementById('chatLog')
+  const membersEl = document.getElementById('members')
+  const chatInput = document.getElementById('chatInput')
+  const chatSend = document.getElementById('chatSend')
 
-const roomInput = document.getElementById('room')
-const remoteInput = document.getElementById('remote')
-const localVideo = document.getElementById('local')
-const remoteVideo = document.getElementById('remoteVideo')
-const joinBtn = document.getElementById('join')
-const callBtn = document.getElementById('call')
-const hangupBtn = document.getElementById('hangup')
+  const roomInput = document.getElementById('room')
+  const remoteInput = document.getElementById('remote')
+  const localVideo = document.getElementById('local')
+  const videosEl = document.getElementById('videos')
+  const joinBtn = document.getElementById('join')
+  const callBtn = document.getElementById('call')
+  const hangupBtn = document.getElementById('hangup')
 
-let state = 'idle'
-let muted = false
-let cameraOff = false
-let screenStream
-let usingScreen = false
-let recorder
-let recordedChunks = []
+  let state = 'idle'
+  let muted = false
+  let cameraOff = false
+  let screenStream
+  let usingScreen = false
+  let recorder
+  let recordedChunks = []
 
 function setError(msg) {
   if (!errorEl) return
@@ -51,16 +49,16 @@ function setState(newState) {
   }
   if (joinBtn) {
     joinBtn.textContent = state === 'idle' ? 'Join' : 'Leave'
-    joinBtn.disabled = state === 'calling'
+    joinBtn.disabled = false
   }
   if (roomInput) {
     roomInput.disabled = state !== 'idle'
   }
   if (remoteInput) {
-    remoteInput.disabled = state !== 'joined'
+    remoteInput.disabled = state === 'idle'
   }
   if (callBtn) {
-    callBtn.disabled = state !== 'joined'
+    callBtn.disabled = state === 'idle'
   }
   if (hangupBtn) {
     hangupBtn.disabled = state !== 'calling'
@@ -103,16 +101,65 @@ function renderMembers(list) {
   })
 }
 
-function setupDataChannel(dc) {
-  dataChannel = dc
+function ensureRemoteTile(peerId) {
+  const peer = peers.get(peerId)
+  if (!peer || !videosEl) return null
+  if (peer.videoEl) return peer.videoEl
+
+  const tile = document.createElement('div')
+  tile.className = 'video-tile'
+  tile.dataset.peer = peerId
+
+  const label = document.createElement('div')
+  label.className = 'video-tile__label'
+  label.textContent = '远端：' + peerId
+
+  const video = document.createElement('video')
+  video.autoplay = true
+  video.playsInline = true
+
+  tile.appendChild(label)
+  tile.appendChild(video)
+  videosEl.appendChild(tile)
+
+  peer.tileEl = tile
+  peer.videoEl = video
+  return video
+}
+
+function removeRemoteTile(peerId) {
+  const peer = peers.get(peerId)
+  if (!peer) return
+  if (peer.videoEl) peer.videoEl.srcObject = null
+  if (peer.tileEl) peer.tileEl.remove()
+  peer.videoEl = null
+  peer.tileEl = null
+}
+
+function syncCallState() {
+  if (state === 'idle') return
+  if (peers.size > 0) {
+    setState('calling')
+    return
+  }
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    setState('joined')
+  } else {
+    setState('idle')
+  }
+}
+
+function setupDataChannel(peerId, dc) {
+  const peer = peers.get(peerId)
+  if (peer) peer.dc = dc
   dc.onopen = () => {
-    appendChat('[system] chat channel opened')
+    appendChat('[system] chat channel opened: ' + peerId)
   }
   dc.onmessage = (e) => {
-    appendChat('peer: ' + e.data)
+    appendChat(peerId + ': ' + e.data)
   }
   dc.onclose = () => {
-    appendChat('[system] chat channel closed')
+    appendChat('[system] chat channel closed: ' + peerId)
   }
 }
 
@@ -120,12 +167,20 @@ function sendChat() {
   if (!chatInput) return
   const text = chatInput.value.trim()
   if (!text) return
-  if (!dataChannel || dataChannel.readyState !== 'open') {
+  const channels = []
+  for (const peer of peers.values()) {
+    if (peer.dc && peer.dc.readyState === 'open') channels.push(peer.dc)
+  }
+  if (!channels.length) {
     setError('聊天通道未建立（请先 Call）')
     return
   }
   setError('')
-  dataChannel.send(text)
+  channels.forEach(dc => {
+    try {
+      dc.send(text)
+    } catch {}
+  })
   appendChat('me: ' + text)
   chatInput.value = ''
 }
@@ -255,20 +310,23 @@ function connectWS() {
   ws.onmessage = async (ev) => {
     const msg = JSON.parse(ev.data)
     if (msg.type === 'offer') {
-      await ensurePC(msg.from)
+      if (!msg.from) return
+      const peer = await ensurePC(msg.from)
       if (remoteInput) remoteInput.value = msg.from || ''
-      await pc.setRemoteDescription(msg.sdp)
-      const answer = await pc.createAnswer()
-      await pc.setLocalDescription(answer)
-      send({ type: 'answer', room: roomId, from: myId, to: msg.from, sdp: pc.localDescription })
+      await peer.pc.setRemoteDescription(msg.sdp)
+      const answer = await peer.pc.createAnswer()
+      await peer.pc.setLocalDescription(answer)
+      send({ type: 'answer', room: roomId, from: myId, to: msg.from, sdp: peer.pc.localDescription })
       setState('calling')
     } else if (msg.type === 'answer') {
-      if (pc) {
-        await pc.setRemoteDescription(msg.sdp)
-      }
+      if (!msg.from) return
+      const peer = peers.get(msg.from)
+      if (peer && peer.pc) await peer.pc.setRemoteDescription(msg.sdp)
     } else if (msg.type === 'candidate') {
-      if (pc && msg.candidate) {
-        try { await pc.addIceCandidate(msg.candidate) } catch {}
+      if (!msg.from) return
+      const peer = peers.get(msg.from)
+      if (peer && peer.pc && msg.candidate) {
+        try { await peer.pc.addIceCandidate(msg.candidate) } catch {}
       }
     } else if (msg.type === 'room_members') {
       const list = msg.members || []
@@ -277,6 +335,12 @@ function connectWS() {
         const peer = list.find(id => id && id !== myId)
         if (peer) remoteInput.value = peer
       }
+
+      const active = new Set(list.filter(id => id && id !== myId))
+      for (const pid of Array.from(peers.keys())) {
+        if (!active.has(pid)) closePeerConnection(pid)
+      }
+      syncCallState()
     }
   }
   ws.onerror = (e) => {
@@ -301,18 +365,32 @@ function connectWS() {
 }
 
 async function ensurePC(target) {
-  remoteId = target
-  if (pc) return
-  pc = new RTCPeerConnection(servers)
+  let peer = peers.get(target)
+  if (peer && peer.pc && peer.pc.connectionState !== 'closed' && peer.pc.connectionState !== 'failed') return peer
+
+  const pc = new RTCPeerConnection(servers)
+  peer = { id: target, pc, dc: null, remoteStream: null, tileEl: null, videoEl: null }
+  peers.set(target, peer)
+
   pc.onicecandidate = (e) => {
-    if (e.candidate) send({ type: 'candidate', room: roomId, from: myId, to: remoteId, candidate: e.candidate })
+    if (e.candidate) send({ type: 'candidate', room: roomId, from: myId, to: target, candidate: e.candidate })
   }
   pc.ontrack = (e) => {
-    if (remoteVideo) remoteVideo.srcObject = e.streams[0]
+    peer.remoteStream = e.streams[0]
+    const video = ensureRemoteTile(target)
+    if (video) video.srcObject = peer.remoteStream
   }
   pc.ondatachannel = (e) => {
-    setupDataChannel(e.channel)
+    setupDataChannel(target, e.channel)
   }
+  pc.onconnectionstatechange = () => {
+    const st = pc.connectionState
+    if (st === 'failed' || st === 'disconnected' || st === 'closed') {
+      closePeerConnection(target)
+      syncCallState()
+    }
+  }
+
   await getMedia()
   localStream.getTracks().forEach(t => pc.addTrack(t, localStream))
   if (usingScreen && screenStream) {
@@ -324,19 +402,32 @@ async function ensurePC(target) {
       }
     }
   }
+
+  return peer
 }
 
-function closePeerConnection() {
-  if (dataChannel) {
-    try { dataChannel.close() } catch {}
+function closePeerConnection(peerId) {
+  if (!peerId) {
+    for (const pid of Array.from(peers.keys())) closePeerConnection(pid)
+    return
   }
-  dataChannel = null
-  remoteId = null
-  if (pc) {
-    try { pc.close() } catch {}
-    pc = null
+
+  const peer = peers.get(peerId)
+  if (!peer) return
+
+  if (peer.dc) {
+    try { peer.dc.close() } catch {}
   }
-  if (remoteVideo) remoteVideo.srcObject = null
+  peer.dc = null
+
+  if (peer.pc) {
+    try { peer.pc.close() } catch {}
+  }
+  peer.pc = null
+
+  removeRemoteTile(peerId)
+  peers.delete(peerId)
+  syncCallState()
 }
 
 function stopLocalMedia() {
@@ -384,10 +475,11 @@ function stopScreenShare() {
   if (localStream) {
     if (localVideo) localVideo.srcObject = localStream
     const cameraTrack = localStream.getVideoTracks()[0]
-    if (pc && cameraTrack) {
-      const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video')
-      if (sender) {
-        sender.replaceTrack(cameraTrack).catch(() => {})
+    if (cameraTrack) {
+      for (const peer of peers.values()) {
+        if (!peer.pc) continue
+        const sender = peer.pc.getSenders().find(s => s.track && s.track.kind === 'video')
+        if (sender) sender.replaceTrack(cameraTrack).catch(() => {})
       }
     }
   } else {
@@ -399,8 +491,10 @@ function stopScreenShare() {
 }
 
 function getRecordStream() {
-  const remoteStream = remoteVideo && remoteVideo.srcObject
-  if (remoteStream) return remoteStream
+  for (const peer of peers.values()) {
+    if (peer.remoteStream) return peer.remoteStream
+  }
+  if (usingScreen && screenStream) return screenStream
   if (localStream) return localStream
   return null
 }
@@ -434,14 +528,14 @@ callBtn.onclick = async () => {
     setError('信令服务器未连接')
     return
   }
-  await ensurePC(id)
-  if (!dataChannel) {
-    const dc = pc.createDataChannel('chat')
-    setupDataChannel(dc)
+  const peer = await ensurePC(id)
+  if (!peer.dc) {
+    const dc = peer.pc.createDataChannel('chat')
+    setupDataChannel(id, dc)
   }
-  const offer = await pc.createOffer()
-  await pc.setLocalDescription(offer)
-  send({ type: 'offer', room: roomId, from: myId, to: id, sdp: pc.localDescription })
+  const offer = await peer.pc.createOffer()
+  await peer.pc.setLocalDescription(offer)
+  send({ type: 'offer', room: roomId, from: myId, to: id, sdp: peer.pc.localDescription })
   setState('calling')
 }
 
@@ -494,8 +588,9 @@ if (screenBtn) {
         usingScreen = true
         screenBtn.textContent = 'Stop Share'
         if (localVideo) localVideo.srcObject = screenStream
-        if (pc) {
-          const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video')
+        for (const peer of peers.values()) {
+          if (!peer.pc) continue
+          const sender = peer.pc.getSenders().find(s => s.track && s.track.kind === 'video')
           if (sender) {
             await sender.replaceTrack(track)
           }

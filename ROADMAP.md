@@ -131,13 +131,13 @@
 
 ### 5.2 小规模 Mesh 多人通话（可选，难度稍高）
 
-- [ ] **多 PeerConnection 管理**  
-  - [ ] 为每个远端成员创建一个单独的 `RTCPeerConnection` 实例。
-  - [ ] 管理一张 `remoteId -> pc` 的映射表，分别处理 offer/answer/candidate。
+- [x] **多 PeerConnection 管理**  
+  - [x] 为每个远端成员创建一个单独的 `RTCPeerConnection` 实例。
+  - [x] 管理一张 `remoteId -> pc` 的映射表，分别处理 offer/answer/candidate。
 
-- [ ] **多路视频布局**  
-  - [ ] 在页面中为每个远端成员添加一个 `<video>` 元素，用来展示该成员的视频流。
-  - [ ] 简单实现网格布局，便于观察多人通话效果。
+- [x] **多路视频布局**  
+  - [x] 在页面中为每个远端成员添加一个 `<video>` 元素，用来展示该成员的视频流。
+  - [x] 简单实现网格布局，便于观察多人通话效果。
 
 > 提示：
 > - Mesh 模式适合 3–4 人的小房间，用于学习很合适；
