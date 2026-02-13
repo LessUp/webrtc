@@ -56,10 +56,7 @@ func (h *Hub) isOriginAllowed(r *http.Request) bool {
 	origin := r.Header.Get("Origin")
 	if origin == "" {
 		host := r.Host
-		if host == "localhost:8080" || strings.HasPrefix(host, "127.0.0.1:") || strings.HasPrefix(host, "localhost:") {
-			return true
-		}
-		return false
+		return strings.HasPrefix(host, "localhost:") || strings.HasPrefix(host, "127.0.0.1:")
 	}
 	if len(h.allowedOrigins) == 0 {
 		u, err := url.Parse(origin)
@@ -133,7 +130,7 @@ func (h *Hub) addClient(c *Client) {
 	}
 	m[c.id] = c
 	log.Printf("signal: join room=%s id=%s", c.room, c.id)
-	h.broadcastMembers(c.room, m)
+	broadcastMembers(c.room, m)
 }
 
 func (h *Hub) removeClient(c *Client) {
@@ -149,19 +146,20 @@ func (h *Hub) removeClient(c *Client) {
 			return
 		}
 		delete(m, c.id)
+		log.Printf("signal: leave room=%s id=%s", room, c.id)
 		c.room = ""
 		if len(m) == 0 {
 			delete(h.rooms, room)
 			log.Printf("signal: room %s closed", room)
 			return
 		}
-		h.broadcastMembers(room, m)
+		broadcastMembers(room, m)
 	}
 }
 
 // broadcastMembers sends the current member list to all clients in a room.
 // Must be called with h.mu held.
-func (h *Hub) broadcastMembers(room string, m map[string]*Client) {
+func broadcastMembers(room string, m map[string]*Client) {
 	members := make([]string, 0, len(m))
 	for id := range m {
 		members = append(members, id)
