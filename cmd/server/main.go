@@ -1,13 +1,16 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
-	"lessup/webrtc/internal/signal"
+	sig "lessup/webrtc/internal/signal"
 )
 
 func main() {
@@ -33,19 +36,34 @@ func main() {
 		}
 	}
 
-	hub := signal.NewHubWithOptions(signal.Options{
+	hub := sig.NewHubWithOptions(sig.Options{
 		AllowedOrigins:  wsAllowed,
 		AllowAllOrigins: wsAllowAll,
 	})
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", hub.HandleWS)
-
-	webDir := filepath.Join("web")
-	fs := http.FileServer(http.Dir(webDir))
-	mux.Handle("/", fs)
+	mux.Handle("/", http.FileServer(http.Dir("web")))
 
 	srv := &http.Server{Addr: addr, Handler: mux}
-	log.Println("server: listening", addr)
-	log.Fatal(srv.ListenAndServe())
+
+	// Graceful shutdown on SIGINT / SIGTERM.
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		log.Println("server: listening", addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+	}()
+
+	<-quit
+	log.Println("server: shutting down ...")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatal("server: forced shutdown:", err)
+	}
+	log.Println("server: stopped")
 }

@@ -33,6 +33,9 @@ web/node_modules/
 .DS_Store
 Thumbs.db
 
+# Docker
+docker-compose.override.yml
+
 # Environment & secrets
 .env
 .env.*

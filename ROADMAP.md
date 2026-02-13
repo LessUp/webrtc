@@ -156,9 +156,9 @@
 - [ ] **HTTPS / WSS（可选）**  
   - [ ] 使用 Nginx/Caddy 等为本项目提供 HTTPS 反向代理，信令走 `wss://`。
 
-- [ ] **Docker 打包（可选）**  
-  - [ ] 编写一个简单的 `Dockerfile`，包含 Go 服务与静态前端文件。
-  - [ ] 通过 `docker build` 和 `docker run` 即可在其他机器上快速运行 Demo。
+- [x] **Docker 打包**  
+  - [x] 编写多阶段 `Dockerfile`，包含 Go 服务与静态前端文件。
+  - [x] 通过 `docker build` 和 `docker run` 即可在其他机器上快速运行 Demo。
 
 ---
 

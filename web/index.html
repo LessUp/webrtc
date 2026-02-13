@@ -1,99 +1,94 @@
 <!doctype html>
-<html>
+<html lang="zh-CN">
 <head>
-<meta charset="utf-8">
-<title>LessUp WebRTC</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="styles.css">
+  <meta charset="utf-8">
+  <title>LessUp WebRTC</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="styles.css">
 </head>
- <body>
+<body>
   <div class="app">
-   <header class="app__header">
-    <div class="brand">
-     <div class="brand__title">LessUp WebRTC</div>
-     <div class="brand__subtitle">Go WebSocket 信令 + 浏览器端 WebRTC Demo（支持聊天/录制/屏幕共享）</div>
-    </div>
-    <div class="status">
-     <div id="status" class="status__text">未连接</div>
-     <div id="error" class="status__error"></div>
-    </div>
-   </header>
-
-   <div class="grid">
-    <section class="card">
-     <h2 class="card__title">房间</h2>
-     <div class="form-row">
-      <span class="label">Room</span>
-      <input id="room" class="input" placeholder="输入房间名（例如 demo）" autocomplete="off">
-      <button id="join" class="button button--primary">Join</button>
-     </div>
-
-     <div class="members">
-      <div class="members__title">在线成员（点击可填入 Remote）</div>
-      <div id="members" class="members__list"></div>
-     </div>
-
-     <div class="footer">
-      <span class="pill">你的 ID：<span id="myId"></span></span>
-     </div>
-    </section>
-
-    <section class="card">
-     <h2 class="card__title">呼叫与控制</h2>
-     <div class="form-row">
-      <span class="label">Remote</span>
-      <input id="remote" class="input" placeholder="选择成员或手动输入" autocomplete="off">
-      <button id="call" class="button button--success">Call</button>
-      <button id="hangup" class="button button--danger">Hangup</button>
-     </div>
-
-     <div class="controls">
-      <button id="muteBtn" class="button">Mute</button>
-      <button id="cameraBtn" class="button">Camera Off</button>
-      <button id="screenBtn" class="button">Share Screen</button>
-     </div>
-
-     <div class="controls">
-      <button id="recStart" class="button">Start Rec</button>
-      <button id="recStop" class="button" disabled>Stop Rec</button>
-     </div>
-
-     <div class="footer">
-      加入房间后，从左侧成员列表选择对端再发起呼叫。
-     </div>
-    </section>
-
-    <section class="card card--full">
-     <h2 class="card__title">视频</h2>
-     <div id="videos" class="videos">
-      <div class="video-tile">
-       <div class="video-tile__label">本地</div>
-       <video id="local" autoplay playsinline muted></video>
+    <header class="app__header">
+      <div class="brand">
+        <div class="brand__title">LessUp WebRTC</div>
+        <div class="brand__subtitle">Go WebSocket 信令 + 浏览器端 WebRTC Demo（支持聊天/录制/屏幕共享）</div>
       </div>
-     </div>
-    </section>
-
-    <section class="card">
-     <h2 class="card__title">聊天</h2>
-     <div id="chatLog" class="chat-log" aria-live="polite"></div>
-     <div class="chat-input">
-      <input id="chatInput" class="input" placeholder="输入消息，Enter 发送" autocomplete="off">
-      <button id="chatSend" class="button button--primary">Send</button>
-     </div>
-     <div class="footer">聊天基于 WebRTC DataChannel（需先建立连接）。</div>
-    </section>
-
-    <section class="card">
-     <h2 class="card__title">使用提示</h2>
-      <div class="muted" style="font-size: 13px; line-height: 1.65;">
-       <div>1. 打开两个窗口，输入相同 Room 并 Join。</div>
-       <div>2. 点击成员 ID 自动填入 Remote，然后 Call（可对多个成员重复）。</div>
-       <div>3. 通话建立后，可聊天、屏幕共享与录制。</div>
+      <div class="status">
+        <div id="status" class="status__text">未连接</div>
+        <div id="error" class="status__error"></div>
       </div>
-    </section>
-   </div>
+    </header>
+
+    <div class="grid">
+      <section class="card">
+        <h2 class="card__title">房间</h2>
+        <div class="form-row">
+          <span class="label">Room</span>
+          <input id="room" class="input" placeholder="输入房间名（例如 demo）" autocomplete="off">
+          <button id="join" class="button button--primary">Join</button>
+        </div>
+        <div class="members">
+          <div class="members__title">在线成员（点击可填入 Remote）</div>
+          <div id="members" class="members__list"></div>
+        </div>
+        <div class="footer">
+          <span class="pill">你的 ID：<span id="myId"></span></span>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="card__title">呼叫与控制</h2>
+        <div class="form-row">
+          <span class="label">Remote</span>
+          <input id="remote" class="input" placeholder="选择成员或手动输入" autocomplete="off">
+          <button id="call" class="button button--success">Call</button>
+          <button id="hangup" class="button button--danger">Hangup</button>
+        </div>
+        <div class="controls">
+          <button id="muteBtn" class="button">Mute</button>
+          <button id="cameraBtn" class="button">Camera Off</button>
+          <button id="screenBtn" class="button">Share Screen</button>
+        </div>
+        <div class="controls">
+          <button id="recStart" class="button">Start Rec</button>
+          <button id="recStop" class="button" disabled>Stop Rec</button>
+        </div>
+        <div class="footer">
+          加入房间后，从左侧成员列表选择对端再发起呼叫。
+        </div>
+      </section>
+
+      <section class="card card--full">
+        <h2 class="card__title">视频</h2>
+        <div id="videos" class="videos">
+          <div class="video-tile">
+            <div class="video-tile__label">本地</div>
+            <video id="local" autoplay playsinline muted></video>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="card__title">聊天</h2>
+        <div id="chatLog" class="chat-log" aria-live="polite"></div>
+        <div class="chat-input">
+          <input id="chatInput" class="input" placeholder="输入消息，Enter 发送" autocomplete="off">
+          <button id="chatSend" class="button button--primary">Send</button>
+        </div>
+        <div class="footer">聊天基于 WebRTC DataChannel（需先建立连接）。</div>
+      </section>
+
+      <section class="card">
+        <h2 class="card__title">使用提示</h2>
+        <div class="muted" style="font-size: 13px; line-height: 1.65;">
+          <div>1. 打开两个窗口，输入相同 Room 并 Join。</div>
+          <div>2. 点击成员 ID 自动填入 Remote，然后 Call（可对多个成员重复）。</div>
+          <div>3. 通话建立后，可聊天、屏幕共享与录制。</div>
+        </div>
+      </section>
+    </div>
   </div>
 
   <script src="app.js"></script>
- </body>
+</body>
 </html>
