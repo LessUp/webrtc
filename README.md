@@ -115,10 +115,14 @@ WebRTC/
 │   └── signal/        # 信令逻辑（房间管理、消息转发）
 ├── web/
 │   ├── index.html     # 浏览器端 UI
-│   └── app.js         # WebRTC & WS 信令逻辑
+│   ├── app.js         # WebRTC & WS 信令逻辑
+│   └── styles.css     # 样式表
 ├── docs/
 │   ├── guide.md       # 项目技术说明（学习向）
 │   └── signaling.md   # 信令与房间管理详解
+├── changelog/         # 变更日志
+├── Dockerfile         # 多阶段 Docker 构建
+├── .editorconfig      # 编辑器格式统一
 ├── go.mod
 ├── .gitignore
 ├── .gitattributes
@@ -131,7 +135,7 @@ WebRTC/
 - [ ] TURN 支持（coturn）
 - [ ] 多人通话（Mesh / 引入 SFU 框架）
 - [ ] 录制与旁路推流（RTMP/RTC）
-- [ ] Docker 镜像与云端部署示例
+- [x] Docker 镜像与云端部署示例
 
 欢迎提交 Issue 与 PR 参与共建。
 

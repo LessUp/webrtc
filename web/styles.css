@@ -167,7 +167,7 @@ body {
   outline: none;
 }
 
-.input:focus {
+.input:focus-visible {
   border-color: var(--focus);
   box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.25);
 }
@@ -268,8 +268,13 @@ body {
   transition: background 0.15s ease;
 }
 
-.member-pill:hover {
+.member-pill:hover:not(:disabled) {
   background: var(--chip-hover);
+}
+
+.member-pill:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .videos {
@@ -324,6 +329,15 @@ body {
 
 .chat-log > div:last-child {
   border-bottom: none;
+}
+
+.chat-log::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-log::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
 }
 
 .chat-input {

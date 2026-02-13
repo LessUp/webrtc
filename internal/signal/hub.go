@@ -88,7 +88,7 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("signal: ws connected from %s", r.RemoteAddr)
 	client := &Client{conn: c, send: make(chan Message, 32)}
-	go h.writePump(client)
+	go client.writePump()
 	defer func() {
 		h.removeClient(client)
 		close(client.send)
@@ -133,24 +133,7 @@ func (h *Hub) addClient(c *Client) {
 	}
 	m[c.id] = c
 	log.Printf("signal: join room=%s id=%s", c.room, c.id)
-
-	members := make([]string, 0, len(m))
-	for id := range m {
-		members = append(members, id)
-	}
-	msg := Message{
-		Type:    "room_members",
-		Room:    c.room,
-		Members: members,
-	}
-	for _, cli := range m {
-		if cli != nil && cli.conn != nil {
-			select {
-			case cli.send <- msg:
-			default:
-			}
-		}
-	}
+	h.broadcastMembers(c.room, m)
 }
 
 func (h *Hub) removeClient(c *Client) {
@@ -172,22 +155,27 @@ func (h *Hub) removeClient(c *Client) {
 			log.Printf("signal: room %s closed", room)
 			return
 		}
+		h.broadcastMembers(room, m)
+	}
+}
 
-		members := make([]string, 0, len(m))
-		for id := range m {
-			members = append(members, id)
-		}
-		msg := Message{
-			Type:    "room_members",
-			Room:    room,
-			Members: members,
-		}
-		for _, cli := range m {
-			if cli != nil && cli.conn != nil {
-				select {
-				case cli.send <- msg:
-				default:
-				}
+// broadcastMembers sends the current member list to all clients in a room.
+// Must be called with h.mu held.
+func (h *Hub) broadcastMembers(room string, m map[string]*Client) {
+	members := make([]string, 0, len(m))
+	for id := range m {
+		members = append(members, id)
+	}
+	msg := Message{
+		Type:    "room_members",
+		Room:    room,
+		Members: members,
+	}
+	for _, cli := range m {
+		if cli != nil && cli.conn != nil {
+			select {
+			case cli.send <- msg:
+			default:
 			}
 		}
 	}
@@ -207,7 +195,7 @@ func (h *Hub) forward(msg Message) {
 	}
 }
 
-func (h *Hub) writePump(c *Client) {
+func (c *Client) writePump() {
 	for msg := range c.send {
 		if err := c.conn.WriteJSON(msg); err != nil {
 			log.Printf("signal: write message error room=%s id=%s: %v", c.room, c.id, err)
@@ -216,4 +204,3 @@ func (h *Hub) writePump(c *Client) {
 		}
 	}
 }
-
