@@ -1,10 +1,43 @@
 package signal
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/gorilla/websocket"
 )
+
+func TestIsOriginAllowed(t *testing.T) {
+	tests := []struct {
+		name    string
+		opts    Options
+		host    string
+		origin  string
+		allowed bool
+	}{
+		{"no origin localhost", Options{}, "localhost:8080", "", true},
+		{"no origin 127.0.0.1", Options{}, "127.0.0.1:8080", "", true},
+		{"no origin external", Options{}, "example.com:8080", "", false},
+		{"origin localhost", Options{}, "localhost:8080", "http://localhost:8080", true},
+		{"origin 127.0.0.1", Options{}, "127.0.0.1:8080", "http://127.0.0.1:8080", true},
+		{"origin external blocked", Options{}, "example.com", "https://example.com", false},
+		{"allow all", Options{AllowAllOrigins: true}, "example.com", "https://evil.com", true},
+		{"whitelist match", Options{AllowedOrigins: []string{"https://example.com"}}, "", "https://example.com", true},
+		{"whitelist miss", Options{AllowedOrigins: []string{"https://example.com"}}, "", "https://evil.com", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := NewHubWithOptions(tt.opts)
+			r := &http.Request{Host: tt.host, Header: http.Header{}}
+			if tt.origin != "" {
+				r.Header.Set("Origin", tt.origin)
+			}
+			if got := h.isOriginAllowed(r); got != tt.allowed {
+				t.Errorf("isOriginAllowed() = %v, want %v", got, tt.allowed)
+			}
+		})
+	}
+}
 
 func drainMessages(ch <-chan Message) {
 	for {

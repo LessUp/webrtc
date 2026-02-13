@@ -13,28 +13,30 @@ import (
 	sig "lessup/webrtc/internal/signal"
 )
 
+func parseOrigins(raw string) (origins []string, allowAll bool) {
+	if raw == "" {
+		return nil, false
+	}
+	if raw == "*" {
+		return nil, true
+	}
+	parts := strings.Split(raw, ",")
+	origins = make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			origins = append(origins, p)
+		}
+	}
+	return origins, false
+}
+
 func main() {
 	addr := ":8080"
 	if v := os.Getenv("ADDR"); v != "" {
 		addr = v
 	}
 
-	var wsAllowAll bool
-	var wsAllowed []string
-	if v := os.Getenv("WS_ALLOWED_ORIGINS"); v != "" {
-		if v == "*" {
-			wsAllowAll = true
-		} else {
-			parts := strings.Split(v, ",")
-			wsAllowed = make([]string, 0, len(parts))
-			for _, p := range parts {
-				p = strings.TrimSpace(p)
-				if p != "" {
-					wsAllowed = append(wsAllowed, p)
-				}
-			}
-		}
-	}
+	wsAllowed, wsAllowAll := parseOrigins(os.Getenv("WS_ALLOWED_ORIGINS"))
 
 	hub := sig.NewHubWithOptions(sig.Options{
 		AllowedOrigins:  wsAllowed,
