@@ -10,6 +10,12 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// Limits to prevent resource exhaustion
+const (
+	MaxRooms          = 1000
+	MaxClientsPerRoom = 50
+)
+
 type Hub struct {
 	mu    sync.RWMutex
 	rooms map[string]map[string]*Client
@@ -86,11 +92,8 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 	log.Printf("signal: ws connected from %s", r.RemoteAddr)
 	client := &Client{conn: c, send: make(chan Message, 32)}
 	go client.writePump()
-	defer func() {
-		h.removeClient(client)
-		close(client.send)
-		c.Close()
-	}()
+
+	// readPump: blocks until read error (disconnect / protocol error)
 	for {
 		var msg Message
 		if err := c.ReadJSON(&msg); err != nil {
@@ -115,6 +118,14 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 			log.Printf("signal: unknown msg type=%s room=%s from=%s", msg.Type, msg.Room, msg.From)
 		}
 	}
+
+	// Cleanup: order matters to avoid goroutine leak and data race.
+	// 1. Remove from hub first (prevents new messages being sent to client.send)
+	h.removeClient(client)
+	// 2. Close send channel (terminates writePump's range loop)
+	close(client.send)
+	// 3. Close WebSocket (writePump may still be draining; conn.Close is safe to call concurrently)
+	c.Close()
 }
 
 func (h *Hub) addClient(c *Client) {
@@ -125,11 +136,21 @@ func (h *Hub) addClient(c *Client) {
 	}
 	m, ok := h.rooms[c.room]
 	if !ok {
+		// Enforce max rooms limit
+		if len(h.rooms) >= MaxRooms {
+			log.Printf("signal: room limit reached (%d), rejecting join room=%s id=%s", MaxRooms, c.room, c.id)
+			return
+		}
 		m = make(map[string]*Client)
 		h.rooms[c.room] = m
 	}
+	// Enforce per-room client limit
+	if len(m) >= MaxClientsPerRoom {
+		log.Printf("signal: room %s full (%d clients), rejecting id=%s", c.room, MaxClientsPerRoom, c.id)
+		return
+	}
 	m[c.id] = c
-	log.Printf("signal: join room=%s id=%s", c.room, c.id)
+	log.Printf("signal: join room=%s id=%s (room size: %d, total rooms: %d)", c.room, c.id, len(m), len(h.rooms))
 	broadcastMembers(c.room, m)
 }
 
@@ -197,8 +218,11 @@ func (c *Client) writePump() {
 	for msg := range c.send {
 		if err := c.conn.WriteJSON(msg); err != nil {
 			log.Printf("signal: write message error room=%s id=%s: %v", c.room, c.id, err)
-			c.conn.Close()
-			break
+			// Don't close conn here — the read goroutine owns conn lifecycle.
+			// Drain remaining messages from send channel so close(send) doesn't block.
+			for range c.send {
+			}
+			return
 		}
 	}
 }

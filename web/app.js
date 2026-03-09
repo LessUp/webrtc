@@ -190,13 +190,29 @@ function connectWS() {
   ws.onclose = () => {
     stopPing()
     ws = null
-    closePeerConnection()
-    roomId = null
-    if (remoteInput) remoteInput.value = ''
-    if (manualClose) { manualClose = false; setError('') }
-    else { setError('信令服务器连接已关闭') }
-    setState('idle')
-    renderMembers([])
+    if (manualClose) {
+      manualClose = false
+      setError('')
+      closePeerConnection()
+      roomId = null
+      if (remoteInput) remoteInput.value = ''
+      setState('idle')
+      renderMembers([])
+    } else {
+      // Unexpected disconnect — attempt reconnection
+      setError('连接断开，正在重连…')
+      if (roomId) {
+        setTimeout(() => {
+          if (roomId && state !== 'idle') {
+            connectWS()
+          }
+        }, 2000)
+      } else {
+        closePeerConnection()
+        setState('idle')
+        renderMembers([])
+      }
+    }
   }
 }
 
