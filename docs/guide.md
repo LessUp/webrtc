@@ -1,3 +1,11 @@
+---
+layout: default
+title: 技术指南 — WebRTC 项目技术说明
+description: WebRTC 示例项目的架构、信令流程、前端实现、媒体控制、DataChannel、录制等技术详解
+---
+
+[← 返回首页]({{ site.baseurl }}/)
+
 # WebRTC 项目技术说明（学习版）
 
 本目录用于记录 WebRTC 示例项目的**学习向文档**，帮助你从整体把握项目架构、信令流程和前端实现。

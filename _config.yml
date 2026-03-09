@@ -1,7 +1,41 @@
 title: WebRTC
-description: Go WebSocket 信令 · 房间管理 · 点对点音视频 · 屏幕共享 · DataChannel · 多人 Mesh
+description: >-
+  基于 Go 的 WebRTC 实时音视频示例项目 —— WebSocket 信令 · 房间管理 · 点对点音视频 ·
+  屏幕共享 · DataChannel 文本聊天 · 本地录制 · 多人 Mesh 通话 · Docker 部署
+url: https://lessup.github.io
+baseurl: /webrtc
 remote_theme: pages-themes/cayman@v0.2.0
+
 plugins:
   - jekyll-remote-theme
+  - jekyll-seo-tag
+
 repository: LessUp/webrtc
 show_downloads: false
+
+# SEO & social
+author: LessUp
+lang: zh-CN
+logo: /webrtc/assets/og-banner.png
+
+# Markdown rendering
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false
+  syntax_highlighter: rouge
+
+# Exclude build artifacts
+exclude:
+  - cmd/
+  - internal/
+  - web/
+  - go.mod
+  - go.sum
+  - Dockerfile
+  - .editorconfig
+  - .gitattributes
+  - .golangci.yml
+  - vendor/
+  - bin/
+  - "*.exe"
