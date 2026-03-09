@@ -15,7 +15,8 @@ description: 基于 Go + WebRTC 的实时音视频示例项目，覆盖信令、
 </p>
 
 <p>
-<a href="https://github.com/LessUp/webrtc/actions/workflows/go.yml"><img src="https://github.com/LessUp/webrtc/actions/workflows/go.yml/badge.svg" alt="Go CI"></a>
+<a href="https://github.com/LessUp/webrtc/actions/workflows/ci.yml"><img src="https://github.com/LessUp/webrtc/actions/workflows/ci.yml/badge.svg" alt="Go CI"></a>
+<a href="https://github.com/LessUp/webrtc/actions/workflows/pages.yml"><img src="https://github.com/LessUp/webrtc/actions/workflows/pages.yml/badge.svg" alt="Pages"></a>
 <a href="https://github.com/LessUp/webrtc/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 <img src="https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white" alt="Go">
 <img src="https://img.shields.io/badge/WebRTC-Enabled-333333?logo=webrtc&logoColor=white" alt="WebRTC">
@@ -156,7 +157,7 @@ webrtc/
 │   ├── guide.md         # 项目技术说明（架构、前端、媒体、录制）
 │   └── signaling.md     # 信令协议与房间管理详解
 ├── .github/workflows/   # CI/CD
-│   ├── go.yml           # Go 构建 + 测试 + 静态分析
+│   ├── ci.yml           # Go 构建 + 测试 + 静态分析
 │   └── pages.yml        # GitHub Pages 部署
 ├── changelog/           # 变更日志
 ├── Dockerfile           # 多阶段构建

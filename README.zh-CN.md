@@ -2,7 +2,8 @@
 
 [English](README.md) | 简体中文 | [📖 在线文档](https://lessup.github.io/webrtc/)
 
-[![Go CI](https://github.com/LessUp/webrtc/actions/workflows/go.yml/badge.svg)](https://github.com/LessUp/webrtc/actions/workflows/go.yml)
+[![Go CI](https://github.com/LessUp/webrtc/actions/workflows/ci.yml/badge.svg)](https://github.com/LessUp/webrtc/actions/workflows/ci.yml)
+[![Pages](https://github.com/LessUp/webrtc/actions/workflows/pages.yml/badge.svg)](https://lessup.github.io/webrtc/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 ![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)
 ![WebRTC](https://img.shields.io/badge/WebRTC-Enabled-333333?logo=webrtc&logoColor=white)
@@ -121,7 +122,7 @@ webrtc/
 │   ├── guide.md         # 项目技术说明（架构、前端、媒体、录制）
 │   └── signaling.md     # 信令协议与房间管理详解
 ├── .github/workflows/   # CI/CD
-│   ├── go.yml           # Go 构建 + 测试 + lint
+│   ├── ci.yml           # Go 构建 + 测试 + lint
 │   └── pages.yml        # GitHub Pages 部署
 ├── changelog/           # 变更日志
 ├── Dockerfile           # 多阶段构建
