@@ -16,7 +16,6 @@ show_downloads: false
 # SEO & social
 author: LessUp
 lang: zh-CN
-logo: /webrtc/assets/og-banner.png
 
 # Markdown rendering
 markdown: kramdown
@@ -36,6 +35,10 @@ exclude:
   - .editorconfig
   - .gitattributes
   - .golangci.yml
+  - .vscode/
+  - .github/
   - vendor/
   - bin/
+  - _site/
+  - .jekyll-cache/
   - "*.exe"

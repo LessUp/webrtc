@@ -1,6 +1,7 @@
 # WebRTC
 
-[![Go CI](https://github.com/LessUp/webrtc/actions/workflows/go.yml/badge.svg)](https://github.com/LessUp/webrtc/actions/workflows/go.yml)
+[![Go CI](https://github.com/LessUp/webrtc/actions/workflows/ci.yml/badge.svg)](https://github.com/LessUp/webrtc/actions/workflows/ci.yml)
+[![Pages](https://github.com/LessUp/webrtc/actions/workflows/pages.yml/badge.svg)](https://lessup.github.io/webrtc/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 ![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)
 ![WebRTC](https://img.shields.io/badge/WebRTC-Enabled-333333?logo=webrtc&logoColor=white)
@@ -93,7 +94,7 @@ webrtc/
 │   ├── guide.md         # Architecture, frontend, media, recording
 │   └── signaling.md     # Signaling protocol deep dive
 ├── .github/workflows/   # CI/CD
-│   ├── go.yml           # Go build + test + lint
+│   ├── ci.yml           # Go build + test + lint
 │   └── pages.yml        # GitHub Pages deployment
 ├── changelog/           # Change logs
 ├── Dockerfile           # Multi-stage build

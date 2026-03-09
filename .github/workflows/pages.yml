@@ -6,7 +6,9 @@ on:
     paths:
       - '*.md'
       - 'docs/**'
+      - 'changelog/**'
       - '_config.yml'
+      - '404.md'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -17,7 +19,7 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -30,6 +32,7 @@ jobs:
           sparse-checkout: |
             *.md
             _config.yml
+            404.md
             docs
             changelog
             LICENSE

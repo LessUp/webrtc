@@ -36,6 +36,11 @@ Thumbs.db
 # Docker
 docker-compose.override.yml
 
+# Jekyll
+_site/
+.jekyll-cache/
+.jekyll-metadata
+
 # Environment & secrets
 .env
 .env.*

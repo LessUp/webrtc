@@ -12,6 +12,7 @@ description: WebRTC 项目各版本变更记录
 
 | 日期 | 摘要 |
 |:-----|:-----|
+| [2026-03-10](changelog/2026-03-10_pages-optimization.md) | Pages 工作流优化、CI badge 修正、_config.yml 清理、Pages 徽章 |
 | [2026-03-09](changelog/2026-03-09_pages-and-quality.md) | GitHub Pages 全面优化、golangci-lint、测试覆盖率增强、文档同步 |
 | [2026-03-09](changelog/2026-03-09_stability-and-security.md) | writePump 协程泄露修复、房间/人数上限、WebSocket 自动重连 |
 | [2026-02-13](changelog/2026-02-13.md) | 全面优化与重构（后端提取 broadcastMembers、前端重构、CI 增强、Docker） |
