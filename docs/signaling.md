@@ -1,4 +1,12 @@
-# 信令与房间管理详解（signaling.md）
+---
+layout: default
+title: 信令协议 — 信令与房间管理详解
+description: WebRTC Demo 中 WebSocket 信令与房间管理的深入讲解，含源码分析与时序图
+---
+
+[← 返回首页]({{ site.baseurl }}/)
+
+# 信令与房间管理详解
 
 本篇文档专门深入讲解本 WebRTC Demo 中的**信令与房间管理**实现，帮助你从源码层面理解：
 
@@ -127,11 +135,12 @@ type Client struct {
 - Hub 通过 `send` 通道异步写消息，`writePump` 协程负责从通道取出消息并写入实际的 WebSocket：
 
   ```go
-  func (h *Hub) writePump(c *Client) {
+  func (c *Client) writePump() {
       for msg := range c.send {
           if err := c.conn.WriteJSON(msg); err != nil {
-              c.conn.Close()
-              break
+              log.Printf("signal: write message error room=%s id=%s: %v", c.room, c.id, err)
+              for range c.send { }
+              return
           }
       }
   }
@@ -158,12 +167,9 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
     }
     log.Printf("signal: ws connected from %s", r.RemoteAddr)
     client := &Client{conn: c, send: make(chan Message, 32)}
-    go h.writePump(client)
-    defer func() {
-        h.removeClient(client)
-        close(client.send)
-        c.Close()
-    }()
+    go client.writePump()
+
+    // readPump: blocks until read error (disconnect / protocol error)
     for {
         var msg Message
         if err := c.ReadJSON(&msg); err != nil {
@@ -188,6 +194,14 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
             log.Printf("signal: unknown msg type=%s room=%s from=%s", msg.Type, msg.Room, msg.From)
         }
     }
+
+    // Cleanup: explicit sequential order to avoid goroutine leak and data race
+    // 1. Remove from hub (prevents new messages being sent to client.send)
+    h.removeClient(client)
+    // 2. Close send channel (terminates writePump's range loop)
+    close(client.send)
+    // 3. Close WebSocket (read goroutine owns conn lifecycle)
+    c.Close()
 }
 ```
 
@@ -198,10 +212,10 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
    - 成功时打印“ws connected from ...”。
 2. 为该连接创建一个 `Client`，带一个缓冲大小为 32 的 `send` 通道。
 3. 启动 `writePump` 协程，负责异步写消息。
-4. 使用 `defer` 确保函数结束时：
-   - 调用 `removeClient` 移除客户端；
-   - 关闭 `send` 通道，结束 `writePump` 写协程；
-   - 关闭连接 `c.Close()`。
+4. 当读循环退出后，按顺序执行显式清理：
+   - 调用 `removeClient` 移除客户端（阻止新消息进入 `send` 通道）；
+   - 关闭 `send` 通道（终止 `writePump` 的 range 循环）；
+   - 关闭 WebSocket 连接（只有读循环持有连接生命周期）。
 
 ### 4.2 消息读取与分发
 
