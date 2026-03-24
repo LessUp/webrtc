@@ -1,11 +1,16 @@
 package signal
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
+	"unicode"
 
 	"github.com/gorilla/websocket"
 )
@@ -14,22 +19,39 @@ import (
 const (
 	MaxRooms          = 1000
 	MaxClientsPerRoom = 50
+	MaxRoomIDLength   = 64
+	MaxClientIDLength = 64
+	SendBufferSize    = 64
+	SendTimeout       = 2 * time.Second
+	WriteWait         = 10 * time.Second
+	PongWait          = 20 * time.Second
+	PingPeriod        = 15 * time.Second
+	MaxMessageSize    = 1 << 20
 )
 
+var errClientClosed = errors.New("client closed")
+
 type Hub struct {
-	mu    sync.RWMutex
-	rooms map[string]map[string]*Client
-	upg   websocket.Upgrader
+	mu      sync.RWMutex
+	rooms   map[string]map[string]*Client
+	clients map[*Client]struct{}
+	upg     websocket.Upgrader
 
 	allowedOrigins  []string
 	allowAllOrigins bool
+	closed          bool
+	nextConnID      atomic.Uint64
 }
 
 type Client struct {
-	id   string
-	room string
-	conn *websocket.Conn
-	send chan Message
+	mu        sync.RWMutex
+	id        string
+	room      string
+	connID    uint64
+	conn      *websocket.Conn
+	send      chan Message
+	closed    chan struct{}
+	closeOnce sync.Once
 }
 
 type Options struct {
@@ -44,6 +66,7 @@ func NewHub() *Hub {
 func NewHubWithOptions(opts Options) *Hub {
 	h := &Hub{
 		rooms:           make(map[string]map[string]*Client),
+		clients:         make(map[*Client]struct{}),
 		allowedOrigins:  append([]string(nil), opts.AllowedOrigins...),
 		allowAllOrigins: opts.AllowAllOrigins,
 	}
@@ -53,6 +76,194 @@ func NewHubWithOptions(opts Options) *Hub {
 		},
 	}
 	return h
+}
+
+func (c *Client) identity() (string, string) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.id, c.room
+}
+
+func (c *Client) setIdentity(id, room string) {
+	c.mu.Lock()
+	c.id = id
+	c.room = room
+	c.mu.Unlock()
+}
+
+func (c *Client) setRoom(room string) {
+	c.mu.Lock()
+	c.room = room
+	c.mu.Unlock()
+}
+
+func (c *Client) sendError(code, text string) error {
+	_, room := c.identity()
+	return c.enqueue(Message{Type: "error", Room: room, Code: code, Error: text})
+}
+
+func (c *Client) enqueue(msg Message) error {
+	select {
+	case <-c.closed:
+		return errClientClosed
+	default:
+	}
+
+	timer := time.NewTimer(SendTimeout)
+	defer timer.Stop()
+
+	select {
+	case <-c.closed:
+		return errClientClosed
+	case c.send <- msg:
+		return nil
+	case <-timer.C:
+		return errors.New("send timeout")
+	}
+}
+
+func (c *Client) close() {
+	c.closeOnce.Do(func() {
+		close(c.closed)
+		if c.conn == nil {
+			return
+		}
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("signal: conn close panic conn=%d: %v", c.connID, r)
+			}
+		}()
+		_ = c.conn.Close()
+	})
+}
+
+func (c *Client) writePump() {
+	ticker := time.NewTicker(PingPeriod)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-c.closed:
+			return
+		case msg := <-c.send:
+			if err := c.conn.SetWriteDeadline(time.Now().Add(WriteWait)); err != nil {
+				log.Printf("signal: set write deadline failed conn=%d: %v", c.connID, err)
+				c.close()
+				return
+			}
+			if err := c.conn.WriteJSON(msg); err != nil {
+				id, room := c.identity()
+				log.Printf("signal: write message error room=%s id=%s conn=%d: %v", room, id, c.connID, err)
+				c.close()
+				return
+			}
+		case <-ticker.C:
+			if err := c.conn.SetWriteDeadline(time.Now().Add(WriteWait)); err != nil {
+				log.Printf("signal: set ping deadline failed conn=%d: %v", c.connID, err)
+				c.close()
+				return
+			}
+			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				id, room := c.identity()
+				log.Printf("signal: ping failed room=%s id=%s conn=%d: %v", room, id, c.connID, err)
+				c.close()
+				return
+			}
+		}
+	}
+}
+
+func normalizeClientID(raw string, maxLen int) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" || len(trimmed) > maxLen {
+		return ""
+	}
+	for _, r := range trimmed {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= 'A' && r <= 'Z':
+		case r >= '0' && r <= '9':
+		case r == '-', r == '_':
+		default:
+			return ""
+		}
+	}
+	return trimmed
+}
+
+func normalizeRoomName(raw string, maxLen int) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" || len(trimmed) > maxLen {
+		return ""
+	}
+	for _, r := range trimmed {
+		if unicode.IsControl(r) {
+			return ""
+		}
+	}
+	return trimmed
+}
+
+func (h *Hub) registerClient(c *Client) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.closed {
+		return false
+	}
+	h.clients[c] = struct{}{}
+	return true
+}
+
+func (h *Hub) unregisterClient(c *Client) {
+	h.mu.Lock()
+	delete(h.clients, c)
+	h.mu.Unlock()
+}
+
+func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
+	conn, err := h.upg.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("signal: ws upgrade failed from %s path=%s: %v", r.RemoteAddr, r.URL.Path, err)
+		return
+	}
+
+	client := &Client{
+		connID: h.nextConnID.Add(1),
+		conn:   conn,
+		send:   make(chan Message, SendBufferSize),
+		closed: make(chan struct{}),
+	}
+	if !h.registerClient(client) {
+		_ = conn.Close()
+		return
+	}
+
+	log.Printf("signal: ws connected from %s conn=%d", r.RemoteAddr, client.connID)
+	defer func() {
+		h.removeClient(client)
+		h.unregisterClient(client)
+		client.close()
+	}()
+
+	go client.writePump()
+
+	conn.SetReadLimit(MaxMessageSize)
+	_ = conn.SetReadDeadline(time.Now().Add(PongWait))
+	conn.SetPongHandler(func(string) error {
+		return conn.SetReadDeadline(time.Now().Add(PongWait))
+	})
+
+	for {
+		var msg Message
+		if err := conn.ReadJSON(&msg); err != nil {
+			id, room := client.identity()
+			log.Printf("signal: read message error room=%s id=%s conn=%d: %v", room, id, client.connID, err)
+			return
+		}
+		if err := h.handleMessage(client, msg); err != nil {
+			log.Printf("signal: handle message error conn=%d type=%s: %v", client.connID, msg.Type, err)
+		}
+	}
 }
 
 func (h *Hub) isOriginAllowed(r *http.Request) bool {
@@ -83,146 +294,224 @@ func (h *Hub) isOriginAllowed(r *http.Request) bool {
 	return false
 }
 
-func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
-	c, err := h.upg.Upgrade(w, r, nil)
-	if err != nil {
-		log.Printf("signal: ws upgrade failed from %s path=%s: %v", r.RemoteAddr, r.URL.Path, err)
-		return
+func (h *Hub) handleMessage(client *Client, msg Message) error {
+	switch msg.Type {
+	case "join":
+		return h.handleJoin(client, msg)
+	case "leave":
+		h.removeClient(client)
+		return nil
+	case "ping":
+		return client.enqueue(Message{Type: "pong"})
+	case "offer", "answer", "candidate", "hangup":
+		return h.forward(client, msg)
+	default:
+		_ = client.sendError("unknown_type", "unsupported message type")
+		return errors.New("unknown message type")
 	}
-	log.Printf("signal: ws connected from %s", r.RemoteAddr)
-	client := &Client{conn: c, send: make(chan Message, 32)}
-	go client.writePump()
-
-	// readPump: blocks until read error (disconnect / protocol error)
-	for {
-		var msg Message
-		if err := c.ReadJSON(&msg); err != nil {
-			log.Printf("signal: read message error room=%s id=%s: %v", client.room, client.id, err)
-			break
-		}
-		switch msg.Type {
-		case "join":
-			client.id = msg.From
-			client.room = msg.Room
-			h.addClient(client)
-		case "leave":
-			h.removeClient(client)
-		case "ping":
-			select {
-			case client.send <- Message{Type: "pong"}:
-			default:
-			}
-		case "offer", "answer", "candidate":
-			h.forward(msg)
-		default:
-			log.Printf("signal: unknown msg type=%s room=%s from=%s", msg.Type, msg.Room, msg.From)
-		}
-	}
-
-	// Cleanup: order matters to avoid goroutine leak and data race.
-	// 1. Remove from hub first (prevents new messages being sent to client.send)
-	h.removeClient(client)
-	// 2. Close send channel (terminates writePump's range loop)
-	close(client.send)
-	// 3. Close WebSocket (writePump may still be draining; conn.Close is safe to call concurrently)
-	c.Close()
 }
 
-func (h *Hub) addClient(c *Client) {
+func (h *Hub) handleJoin(c *Client, msg Message) error {
+	id := normalizeClientID(msg.From, MaxClientIDLength)
+	if id == "" {
+		_ = c.sendError("invalid_id", "invalid client id")
+		return errors.New("invalid client id")
+	}
+	room := normalizeRoomName(msg.Room, MaxRoomIDLength)
+	if room == "" {
+		_ = c.sendError("invalid_room", "invalid room name")
+		return errors.New("invalid room")
+	}
+
+	boundID, currentRoom := c.identity()
+	if boundID != "" && boundID != id {
+		_ = c.sendError("identity_locked", "connection identity is immutable")
+		return errors.New("identity mismatch")
+	}
+	if currentRoom != "" && currentRoom != room {
+		_ = c.sendError("already_joined", "leave the current room before joining another")
+		return errors.New("already joined")
+	}
+
+	c.setIdentity(id, room)
+	if err := h.addClient(c); err != nil {
+		c.setRoom("")
+		_ = c.sendError(err.Code, err.Error())
+		return err
+	}
+	if err := c.enqueue(Message{Type: "joined", Room: room, From: id}); err != nil {
+		return err
+	}
+	h.broadcastMembers(room)
+	return nil
+}
+
+type protocolError struct {
+	Code string
+	Text string
+}
+
+func (e *protocolError) Error() string { return e.Text }
+
+func (h *Hub) addClient(c *Client) *protocolError {
+	id, room := c.identity()
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if c.room == "" || c.id == "" {
-		return
+	if room == "" || id == "" {
+		return &protocolError{Code: "invalid_join", Text: "room and id are required"}
 	}
-	m, ok := h.rooms[c.room]
+	m, ok := h.rooms[room]
 	if !ok {
-		// Enforce max rooms limit
 		if len(h.rooms) >= MaxRooms {
-			log.Printf("signal: room limit reached (%d), rejecting join room=%s id=%s", MaxRooms, c.room, c.id)
-			return
+			log.Printf("signal: room limit reached (%d), rejecting join room=%s id=%s", MaxRooms, room, id)
+			return &protocolError{Code: "room_limit_reached", Text: "room limit reached"}
 		}
 		m = make(map[string]*Client)
-		h.rooms[c.room] = m
+		h.rooms[room] = m
 	}
-	// Enforce per-room client limit
+	if existing, exists := m[id]; exists {
+		if existing == c {
+			return nil
+		}
+		log.Printf("signal: duplicate id rejected room=%s id=%s", room, id)
+		return &protocolError{Code: "duplicate_id", Text: "client id already exists in room"}
+	}
 	if len(m) >= MaxClientsPerRoom {
-		log.Printf("signal: room %s full (%d clients), rejecting id=%s", c.room, MaxClientsPerRoom, c.id)
-		return
+		log.Printf("signal: room %s full (%d clients), rejecting id=%s", room, MaxClientsPerRoom, id)
+		return &protocolError{Code: "room_full", Text: "room is full"}
 	}
-	m[c.id] = c
-	log.Printf("signal: join room=%s id=%s (room size: %d, total rooms: %d)", c.room, c.id, len(m), len(h.rooms))
-	broadcastMembers(c.room, m)
+	m[id] = c
+	log.Printf("signal: join room=%s id=%s conn=%d (room size: %d, total rooms: %d)", room, id, c.connID, len(m), len(h.rooms))
+	return nil
 }
 
 func (h *Hub) removeClient(c *Client) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if c.room == "" || c.id == "" {
+	id, room := c.identity()
+	if room == "" || id == "" {
 		return
 	}
-	room := c.room
+
+	var shouldBroadcast bool
+	var roomRemoved bool
+
+	h.mu.Lock()
 	if m, ok := h.rooms[room]; ok {
-		if _, ok2 := m[c.id]; !ok2 {
-			c.room = ""
+		current, ok2 := m[id]
+		if !ok2 || current != c {
+			h.mu.Unlock()
+			c.setRoom("")
 			return
 		}
-		delete(m, c.id)
-		log.Printf("signal: leave room=%s id=%s", room, c.id)
-		c.room = ""
+		delete(m, id)
+		log.Printf("signal: leave room=%s id=%s conn=%d", room, id, c.connID)
 		if len(m) == 0 {
 			delete(h.rooms, room)
 			log.Printf("signal: room %s closed", room)
-			return
+			roomRemoved = true
+		} else {
+			shouldBroadcast = true
 		}
-		broadcastMembers(room, m)
+	}
+	h.mu.Unlock()
+	c.setRoom("")
+	if shouldBroadcast && !roomRemoved {
+		h.broadcastMembers(room)
 	}
 }
 
-// broadcastMembers sends the current member list to all clients in a room.
-// Must be called with h.mu held.
-func broadcastMembers(room string, m map[string]*Client) {
-	members := make([]string, 0, len(m))
-	for id := range m {
-		members = append(members, id)
+func (h *Hub) broadcastMembers(room string) {
+	h.mu.RLock()
+	m, ok := h.rooms[room]
+	if !ok {
+		h.mu.RUnlock()
+		return
 	}
+	recipients := make([]*Client, 0, len(m))
+	members := make([]string, 0, len(m))
+	for id, cli := range m {
+		members = append(members, id)
+		recipients = append(recipients, cli)
+	}
+	h.mu.RUnlock()
+
+	sort.Strings(members)
 	msg := Message{
 		Type:    "room_members",
 		Room:    room,
 		Members: members,
 	}
-	for _, cli := range m {
-		if cli != nil && cli.conn != nil {
-			select {
-			case cli.send <- msg:
-			default:
-			}
+	for _, cli := range recipients {
+		if cli == nil {
+			continue
+		}
+		if err := cli.enqueue(msg); err != nil {
+			log.Printf("signal: members broadcast failed room=%s conn=%d: %v", room, cli.connID, err)
+			h.removeClient(cli)
+			cli.close()
 		}
 	}
 }
 
-func (h *Hub) forward(msg Message) {
+func (h *Hub) forward(sender *Client, msg Message) error {
+	id, room := sender.identity()
+	if id == "" || room == "" {
+		_ = sender.sendError("not_joined", "join a room first")
+		return errors.New("sender not joined")
+	}
+	to := normalizeClientID(msg.To, MaxClientIDLength)
+	if to == "" || to == id {
+		_ = sender.sendError("invalid_target", "invalid target client")
+		return errors.New("invalid target")
+	}
+
 	h.mu.RLock()
-	defer h.mu.RUnlock()
-	if m, ok := h.rooms[msg.Room]; ok {
-		if dst, ok := m[msg.To]; ok && dst != nil && dst.conn != nil {
-			select {
-			case dst.send <- msg:
-			default:
-				// drop if buffer full to avoid blocking the hub
-			}
-		}
+	m, ok := h.rooms[room]
+	if !ok {
+		h.mu.RUnlock()
+		_ = sender.sendError("room_missing", "room no longer exists")
+		return errors.New("room missing")
 	}
+	current, ok := m[id]
+	if !ok || current != sender {
+		h.mu.RUnlock()
+		_ = sender.sendError("membership_lost", "client is no longer registered in room")
+		return errors.New("sender not registered")
+	}
+	dst, ok := m[to]
+	h.mu.RUnlock()
+	if !ok || dst == nil {
+		_ = sender.sendError("target_not_found", "target client is not in the room")
+		return errors.New("target not found")
+	}
+
+	msg.Room = room
+	msg.From = id
+	msg.To = to
+	if err := dst.enqueue(msg); err != nil {
+		log.Printf("signal: forward failed room=%s from=%s to=%s: %v", room, id, to, err)
+		h.removeClient(dst)
+		dst.close()
+		return err
+	}
+	return nil
 }
 
-func (c *Client) writePump() {
-	for msg := range c.send {
-		if err := c.conn.WriteJSON(msg); err != nil {
-			log.Printf("signal: write message error room=%s id=%s: %v", c.room, c.id, err)
-			// Don't close conn here — the read goroutine owns conn lifecycle.
-			// Drain remaining messages from send channel so close(send) doesn't block.
-			for range c.send {
-			}
-			return
-		}
+func (h *Hub) Close() {
+	h.mu.Lock()
+	if h.closed {
+		h.mu.Unlock()
+		return
+	}
+	h.closed = true
+	clients := make([]*Client, 0, len(h.clients))
+	for client := range h.clients {
+		clients = append(clients, client)
+	}
+	h.mu.Unlock()
+
+	for _, client := range clients {
+		h.removeClient(client)
+		client.close()
+		h.unregisterClient(client)
 	}
 }

@@ -1,11 +1,50 @@
 package signal
 
 import (
+	"io"
+	"log"
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/gorilla/websocket"
 )
+
+func TestMain(m *testing.M) {
+	log.SetOutput(io.Discard)
+	os.Exit(m.Run())
+}
+
+func newTestClient(id, room string, buffer int) *Client {
+	if buffer <= 0 {
+		buffer = 4
+	}
+	return &Client{
+		id:     id,
+		room:   room,
+		conn:   &websocket.Conn{},
+		send:   make(chan Message, buffer),
+		closed: make(chan struct{}),
+	}
+}
+
+func drainMessages(ch <-chan Message) {
+	for {
+		select {
+		case <-ch:
+		default:
+			return
+		}
+	}
+}
+
+func membersSet(members []string) map[string]struct{} {
+	res := make(map[string]struct{}, len(members))
+	for _, id := range members {
+		res[id] = struct{}{}
+	}
+	return res
+}
 
 func TestIsOriginAllowed(t *testing.T) {
 	tests := []struct {
@@ -39,44 +78,22 @@ func TestIsOriginAllowed(t *testing.T) {
 	}
 }
 
-func drainMessages(ch <-chan Message) {
-	for {
-		select {
-		case <-ch:
-		default:
-			return
-		}
-	}
-}
-
-func membersSet(members []string) map[string]struct{} {
-	res := make(map[string]struct{}, len(members))
-	for _, id := range members {
-		res[id] = struct{}{}
-	}
-	return res
-}
-
 func TestHubAddClientBroadcastsMembers(t *testing.T) {
 	h := NewHub()
 
-	c1 := &Client{
-		id:   "a",
-		room: "room1",
-		conn: &websocket.Conn{},
-		send: make(chan Message, 4),
-	}
-	c2 := &Client{
-		id:   "b",
-		room: "room1",
-		conn: &websocket.Conn{},
-		send: make(chan Message, 4),
-	}
+	c1 := newTestClient("a", "room1", 4)
+	c2 := newTestClient("b", "room1", 4)
 
-	h.addClient(c1)
+	if err := h.addClient(c1); err != nil {
+		t.Fatalf("addClient(c1) error: %v", err)
+	}
+	h.broadcastMembers("room1")
 	drainMessages(c1.send)
 
-	h.addClient(c2)
+	if err := h.addClient(c2); err != nil {
+		t.Fatalf("addClient(c2) error: %v", err)
+	}
+	h.broadcastMembers("room1")
 
 	select {
 	case msg := <-c1.send:
@@ -109,21 +126,16 @@ func TestHubRemoveClientUpdatesMembersAndDeletesEmptyRoom(t *testing.T) {
 	h := NewHub()
 	room := "room1"
 
-	c1 := &Client{
-		id:   "a",
-		room: room,
-		conn: &websocket.Conn{},
-		send: make(chan Message, 4),
-	}
-	c2 := &Client{
-		id:   "b",
-		room: room,
-		conn: &websocket.Conn{},
-		send: make(chan Message, 4),
-	}
+	c1 := newTestClient("a", room, 4)
+	c2 := newTestClient("b", room, 4)
 
-	h.addClient(c1)
-	h.addClient(c2)
+	if err := h.addClient(c1); err != nil {
+		t.Fatalf("addClient(c1) error: %v", err)
+	}
+	if err := h.addClient(c2); err != nil {
+		t.Fatalf("addClient(c2) error: %v", err)
+	}
+	h.broadcastMembers(room)
 	drainMessages(c1.send)
 	drainMessages(c2.send)
 
@@ -152,24 +164,18 @@ func TestHubForwardSendsToTargetClient(t *testing.T) {
 	h := NewHub()
 	room := "room1"
 
-	dst := &Client{
-		id:   "b",
-		room: room,
-		conn: &websocket.Conn{},
-		send: make(chan Message, 1),
+	src := newTestClient("a", room, 4)
+	dst := newTestClient("b", room, 1)
+	h.rooms[room] = map[string]*Client{"a": src, "b": dst}
+
+	msg := Message{Type: "offer", Room: "spoofed", From: "spoofed", To: "b"}
+	if err := h.forward(src, msg); err != nil {
+		t.Fatalf("forward error: %v", err)
 	}
-
-	h.rooms[room] = map[string]*Client{
-		"b": dst,
-	}
-
-	msg := Message{Type: "offer", Room: room, From: "a", To: "b"}
-
-	h.forward(msg)
 
 	select {
 	case got := <-dst.send:
-		if got.Type != msg.Type || got.From != msg.From || got.Room != msg.Room || got.To != msg.To {
+		if got.Type != msg.Type || got.From != "a" || got.Room != room || got.To != "b" {
 			t.Fatalf("unexpected forwarded message: %#v", got)
 		}
 	default:
@@ -177,17 +183,19 @@ func TestHubForwardSendsToTargetClient(t *testing.T) {
 	}
 }
 
-func TestHubAddClientIgnoresEmptyRoomOrID(t *testing.T) {
+func TestHubAddClientRejectsEmptyRoomOrID(t *testing.T) {
 	h := NewHub()
 
-	c1 := &Client{id: "", room: "room1", conn: &websocket.Conn{}, send: make(chan Message, 4)}
-	h.addClient(c1)
+	if err := h.addClient(newTestClient("", "room1", 4)); err == nil {
+		t.Fatal("expected empty id to be rejected")
+	}
 	if len(h.rooms) != 0 {
 		t.Fatalf("expected no rooms for empty id, got %d", len(h.rooms))
 	}
 
-	c2 := &Client{id: "a", room: "", conn: &websocket.Conn{}, send: make(chan Message, 4)}
-	h.addClient(c2)
+	if err := h.addClient(newTestClient("a", "", 4)); err == nil {
+		t.Fatal("expected empty room to be rejected")
+	}
 	if len(h.rooms) != 0 {
 		t.Fatalf("expected no rooms for empty room, got %d", len(h.rooms))
 	}
@@ -196,8 +204,11 @@ func TestHubAddClientIgnoresEmptyRoomOrID(t *testing.T) {
 func TestHubRemoveClientIdempotent(t *testing.T) {
 	h := NewHub()
 
-	c := &Client{id: "a", room: "room1", conn: &websocket.Conn{}, send: make(chan Message, 4)}
-	h.addClient(c)
+	c := newTestClient("a", "room1", 4)
+	if err := h.addClient(c); err != nil {
+		t.Fatalf("addClient error: %v", err)
+	}
+	h.broadcastMembers("room1")
 	drainMessages(c.send)
 
 	h.removeClient(c)
@@ -205,52 +216,52 @@ func TestHubRemoveClientIdempotent(t *testing.T) {
 		t.Fatalf("room should be deleted after last member leaves")
 	}
 
-	// Second remove should be a no-op (room is "" now)
 	h.removeClient(c)
-	if c.room != "" {
+	if _, room := c.identity(); room != "" {
 		t.Fatalf("room should remain empty after second remove")
 	}
 }
 
 func TestHubForwardToNonExistentRoom(t *testing.T) {
 	h := NewHub()
-	msg := Message{Type: "offer", Room: "ghost", From: "a", To: "b"}
-	// Should not panic
-	h.forward(msg)
+	src := newTestClient("a", "ghost", 4)
+	if err := h.forward(src, Message{Type: "offer", To: "b"}); err == nil {
+		t.Fatal("expected missing room error")
+	}
 }
 
 func TestHubForwardToNonExistentClient(t *testing.T) {
 	h := NewHub()
 	room := "room1"
-	c := &Client{id: "a", room: room, conn: &websocket.Conn{}, send: make(chan Message, 4)}
-	h.addClient(c)
+	c := newTestClient("a", room, 4)
+	if err := h.addClient(c); err != nil {
+		t.Fatalf("addClient error: %v", err)
+	}
 	drainMessages(c.send)
 
-	msg := Message{Type: "offer", Room: room, From: "a", To: "nonexistent"}
-	// Should not panic, message is silently dropped
-	h.forward(msg)
-
-	select {
-	case <-c.send:
-		t.Fatalf("no message should be sent to client a")
-	default:
+	if err := h.forward(c, Message{Type: "offer", To: "nonexistent"}); err == nil {
+		t.Fatal("expected target not found error")
 	}
 }
 
 func TestHubMultipleRoomsIsolation(t *testing.T) {
 	h := NewHub()
 
-	c1 := &Client{id: "a", room: "room1", conn: &websocket.Conn{}, send: make(chan Message, 4)}
-	c2 := &Client{id: "b", room: "room2", conn: &websocket.Conn{}, send: make(chan Message, 4)}
+	c1 := newTestClient("a", "room1", 4)
+	c2 := newTestClient("b", "room2", 4)
 
-	h.addClient(c1)
-	h.addClient(c2)
+	if err := h.addClient(c1); err != nil {
+		t.Fatalf("addClient(c1) error: %v", err)
+	}
+	if err := h.addClient(c2); err != nil {
+		t.Fatalf("addClient(c2) error: %v", err)
+	}
 	drainMessages(c1.send)
 	drainMessages(c2.send)
 
-	// Forward in room1 should not reach room2
-	msg := Message{Type: "offer", Room: "room1", From: "x", To: "b"}
-	h.forward(msg)
+	if err := h.forward(c1, Message{Type: "offer", To: "b"}); err == nil {
+		t.Fatal("expected isolation to prevent cross-room forwarding")
+	}
 
 	select {
 	case <-c2.send:
@@ -266,21 +277,22 @@ func TestHubMultipleRoomsIsolation(t *testing.T) {
 func TestHubMaxRoomsLimit(t *testing.T) {
 	h := NewHub()
 
-	// Fill up to MaxRooms
 	for i := 0; i < MaxRooms; i++ {
 		room := "room" + string(rune('A'+i%26)) + string(rune('0'+i/26%10)) + string(rune('0'+i/260%10)) + string(rune('0'+i/2600%10))
-		c := &Client{id: "user", room: room, conn: &websocket.Conn{}, send: make(chan Message, 4)}
-		h.addClient(c)
-		drainMessages(c.send)
+		c := newTestClient("user", room, 4)
+		if err := h.addClient(c); err != nil {
+			t.Fatalf("unexpected addClient error at %d: %v", i, err)
+		}
 	}
 
 	if len(h.rooms) != MaxRooms {
 		t.Fatalf("expected %d rooms, got %d", MaxRooms, len(h.rooms))
 	}
 
-	// One more should be rejected
-	overflow := &Client{id: "overflow", room: "overflow_room", conn: &websocket.Conn{}, send: make(chan Message, 4)}
-	h.addClient(overflow)
+	overflow := newTestClient("overflow", "overflow_room", 4)
+	if err := h.addClient(overflow); err == nil {
+		t.Fatal("expected room limit error")
+	}
 
 	if len(h.rooms) != MaxRooms {
 		t.Fatalf("expected room count to remain %d after overflow, got %d", MaxRooms, len(h.rooms))
@@ -296,46 +308,44 @@ func TestHubMaxClientsPerRoomLimit(t *testing.T) {
 
 	for i := 0; i < MaxClientsPerRoom; i++ {
 		id := "u" + string(rune('A'+i%26)) + string(rune('0'+i/26%10))
-		c := &Client{id: id, room: room, conn: &websocket.Conn{}, send: make(chan Message, 4)}
-		h.addClient(c)
-		drainMessages(c.send)
+		c := newTestClient(id, room, 4)
+		if err := h.addClient(c); err != nil {
+			t.Fatalf("unexpected addClient error at %d: %v", i, err)
+		}
 	}
 
 	if len(h.rooms[room]) != MaxClientsPerRoom {
 		t.Fatalf("expected %d clients, got %d", MaxClientsPerRoom, len(h.rooms[room]))
 	}
 
-	// One more should be rejected
-	overflow := &Client{id: "overflow", room: room, conn: &websocket.Conn{}, send: make(chan Message, 4)}
-	h.addClient(overflow)
+	overflow := newTestClient("overflow", room, 4)
+	if err := h.addClient(overflow); err == nil {
+		t.Fatal("expected room full error")
+	}
 
 	if len(h.rooms[room]) != MaxClientsPerRoom {
 		t.Fatalf("expected client count to remain %d after overflow, got %d", MaxClientsPerRoom, len(h.rooms[room]))
 	}
 }
 
-func TestHubForwardDropsWhenBufferFull(t *testing.T) {
+func TestHubForwardFailsWhenBufferFull(t *testing.T) {
 	h := NewHub()
 	room := "room1"
 
-	// Create client with buffer size 1
-	dst := &Client{id: "b", room: room, conn: &websocket.Conn{}, send: make(chan Message, 1)}
-	h.rooms[room] = map[string]*Client{"b": dst}
+	src := newTestClient("a", room, 4)
+	dst := newTestClient("b", room, 1)
+	h.rooms[room] = map[string]*Client{"a": src, "b": dst}
 
-	// Fill the buffer
-	h.forward(Message{Type: "offer", Room: room, From: "a", To: "b"})
-	// Second forward should be silently dropped (buffer full)
-	h.forward(Message{Type: "answer", Room: room, From: "a", To: "b"})
+	if err := h.forward(src, Message{Type: "offer", To: "b"}); err != nil {
+		t.Fatalf("unexpected first forward error: %v", err)
+	}
+	if err := h.forward(src, Message{Type: "answer", To: "b"}); err == nil {
+		t.Fatal("expected second forward to fail when buffer is full")
+	}
 
 	got := <-dst.send
 	if got.Type != "offer" {
 		t.Fatalf("expected first message (offer), got %s", got.Type)
-	}
-
-	select {
-	case msg := <-dst.send:
-		t.Fatalf("expected no second message, got %s", msg.Type)
-	default:
 	}
 }
 
@@ -353,6 +363,9 @@ func TestNewHubDefaultOptions(t *testing.T) {
 	if h.rooms == nil {
 		t.Fatal("rooms map should be initialized")
 	}
+	if h.clients == nil {
+		t.Fatal("clients map should be initialized")
+	}
 	if h.allowAllOrigins {
 		t.Fatal("allowAllOrigins should default to false")
 	}
@@ -365,9 +378,63 @@ func TestNewHubWithOptionsCopiesSlice(t *testing.T) {
 	origins := []string{"https://example.com"}
 	h := NewHubWithOptions(Options{AllowedOrigins: origins})
 
-	// Mutating the original slice should not affect the hub
 	origins[0] = "https://evil.com"
 	if h.allowedOrigins[0] != "https://example.com" {
 		t.Fatal("hub should have a defensive copy of allowedOrigins")
+	}
+}
+
+func TestHubRejectsDuplicateClientID(t *testing.T) {
+	h := NewHub()
+	first := newTestClient("dup", "room1", 4)
+	second := newTestClient("dup", "room1", 4)
+
+	if err := h.addClient(first); err != nil {
+		t.Fatalf("unexpected first add error: %v", err)
+	}
+	if err := h.addClient(second); err == nil {
+		t.Fatal("expected duplicate id to be rejected")
+	}
+	if h.rooms["room1"]["dup"] != first {
+		t.Fatal("original client should remain registered")
+	}
+}
+
+func TestHandleJoinAllowsHumanReadableRoomNames(t *testing.T) {
+	h := NewHub()
+	client := newTestClient("", "", 4)
+
+	err := h.handleJoin(client, Message{Type: "join", From: "user_01", Room: "团队 room.1"})
+	if err != nil {
+		t.Fatalf("expected readable room name to be accepted, got %v", err)
+	}
+	if _, room := client.identity(); room != "团队 room.1" {
+		t.Fatalf("expected room to be preserved, got %q", room)
+	}
+}
+
+func TestClientCloseHandlesZeroValueConn(t *testing.T) {
+	client := newTestClient("a", "room1", 1)
+
+	client.close()
+	select {
+	case <-client.closed:
+	default:
+		t.Fatal("expected client closed channel to be closed")
+	}
+
+	client.close()
+}
+
+func TestHubRemoveClientDoesNotRemoveReplacementConnection(t *testing.T) {
+	h := NewHub()
+	room := "room1"
+	first := newTestClient("dup", room, 4)
+	second := newTestClient("dup", room, 4)
+	h.rooms[room] = map[string]*Client{"dup": second}
+
+	h.removeClient(first)
+	if h.rooms[room]["dup"] != second {
+		t.Fatal("removing old connection should not remove replacement client")
 	}
 }

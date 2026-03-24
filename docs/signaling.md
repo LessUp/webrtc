@@ -28,10 +28,10 @@ WebRTC 负责**媒体和数据通道的端到端传输**，但它本身并不定
 
 在浏览器建立 WebRTC 连接之前，需要交换一些“信令”信息：
 
-- 谁在什么房间（`join/leave`）；
+- 谁在什么房间（`join/joined/leave`）；
 - 双方的 SDP（`offer/answer`）；
 - ICE 候选（`candidate`）；
-- 其它辅助信息（比如房间成员列表 `room_members`）。
+- 其它辅助信息（比如房间成员列表 `room_members`、显式挂断 `hangup`、协议错误 `error`）。
 
 本项目选择：
 
@@ -65,14 +65,16 @@ type Message struct {
 
 - `Type`：消息类型（字符串），例如：
   - `"join"`：加入房间请求（从前端发给服务端）；
-  - `"leave"`：离开房间请求（当前 Demo 中暂时很少手动用到）；
+  - `"joined"`：服务端确认加入成功；
+  - `"leave"`：离开房间请求；
   - `"offer"` / `"answer"`：SDP 交换；
   - `"candidate"`：ICE 候选；
+  - `"hangup"`：显式结束某条 PeerConnection；
   - `"room_members"`：服务端广播的当前房间成员列表（从服务端发给前端）；
-  - `"ping"`：可选心跳消息（从前端发给服务端，用于保活/学习）；
-  - `"pong"`：服务端对 `"ping"` 的可选回应（从服务端发给前端）。
+  - `"error"`：协议级错误（如重复 ID、非法房间名等）；
+  - `"ping"` / `"pong"`：兼容保留的应用层心跳消息。
 - `Room`：房间名，字符串。
-- `From`：发送方 ID（前端生成的 `myId`）。
+- `From`：发送方 ID。加入时由客户端申请，加入成功后由服务端绑定到该 WebSocket，并覆盖后续转发消息里的 `from`。
 - `To`：接收方 ID，仅点对点消息（`offer/answer/candidate`）需要。
 - `SDP`：SDP 内容，使用 `json.RawMessage` 承载浏览器产生的原始 SDP 对象。
 - `Candidate`：ICE 候选，同样用 `json.RawMessage` 存储浏览器给出的对象。
@@ -82,6 +84,7 @@ type Message struct {
 
 - 一个 `Message` 结构可以覆盖所有信令类型，结构简单；
 - 使用 `json.RawMessage` 避免在 Go 中深度解析 SDP/ICE，只做**透明转发**。
+- 服务端只接受一次身份绑定，后续会校验连接和房间归属，避免客户端伪造 `from/room`。
 
 ---
 
@@ -118,11 +121,12 @@ type Client struct {
 - 按房间组织客户端：
   - `rooms["room1"]["userA"] = *Client`
   - `rooms["room1"]["userB"] = *Client`
-- 处理下列操作：
-  - WebSocket 连接升级与关闭；
-  - 收到 `join/leave/ping/offer/answer/candidate` 消息并处理；
-  - 对 `offer/answer/candidate` 按 `Room + To` 进行转发；
-  - 在房间成员变化时，广播 `room_members` 消息。
+  - 处理下列操作：
+    - WebSocket 连接升级与关闭；
+    - 收到 `join/leave/ping/offer/answer/candidate/hangup` 消息并处理；
+    - 对 `offer/answer/candidate/hangup` 按 `Room + To` 进行转发；
+    - 在房间成员变化时，广播 `room_members` 消息；
+    - 对非法消息回写 `error`。
 
 ### 3.2 Client 的职责
 
@@ -212,6 +216,7 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
    - 成功时打印“ws connected from ...”。
 2. 为该连接创建一个 `Client`，带一个缓冲大小为 32 的 `send` 通道。
 3. 启动 `writePump` 协程，负责异步写消息。
+4. 为连接设置 `SetReadLimit`、读超时、`PongHandler`，并由服务端定期发送 WebSocket ping 帧。
 4. 当读循环退出后，按顺序执行显式清理：
    - 调用 `removeClient` 移除客户端（阻止新消息进入 `send` 通道）；
    - 关闭 `send` 通道（终止 `writePump` 的 range 循环）；
@@ -221,11 +226,11 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 
 - 在 `for` 循环中，通过 `c.ReadJSON(&msg)` 从 WebSocket 读取 JSON 并反序列化为 `Message`。
 - 根据 `msg.Type`：
-  - `join`：设置 `client.id`/`client.room`，并调用 `addClient`；
+  - `join`：校验 `id/room`，绑定连接身份，加入成功后回写 `joined`；
   - `leave`：调用 `removeClient`；
-  - `ping`：可选心跳消息，服务端可回写 `pong`（非阻塞发送）；
-  - `offer/answer/candidate`：调用 `forward(msg)`，根据房间和 `To` 转发；
-  - 其他：打印未知类型日志。
+  - `ping`：兼容回写 `pong`；
+  - `offer/answer/candidate/hangup`：调用 `forward(...)`，由服务端填充真实 `from/room` 后转发；
+  - 其他：回写 `error`。
 
 当 `ReadJSON` 返回错误（连接关闭/协议错误等）：
 
