@@ -15,12 +15,12 @@ A minimal WebRTC demo project built with Go, providing a WebSocket signaling ser
 
 | Feature | Description |
 |:--------|:------------|
-| **WebSocket Signaling** | Gorilla WebSocket for Offer/Answer/ICE Candidate relay within rooms, with heartbeat keep-alive |
+| **WebSocket Signaling** | Gorilla WebSocket for Offer/Answer/ICE Candidate relay within rooms, with heartbeat, join acknowledgement, and explicit hangup |
 | **Media Controls** | Mute/unmute, camera on/off, screen sharing (`getDisplayMedia`) |
 | **DataChannel** | Peer-to-peer text chat without server relay |
 | **Local Recording** | MediaRecorder captures audio/video streams, exports `.webm` for download |
 | **Multi-party Mesh** | Room member list broadcast, multi-PeerConnection management, grid video layout |
-| **Security** | Origin validation whitelist, room/client limits, auto-reconnection |
+| **Security** | Origin validation whitelist, identity binding, duplicate ID rejection, room/client limits, auto-reconnection |
 | **Docker** | Multi-stage Dockerfile, Go compilation + static frontend packaging |
 
 ## Architecture
@@ -75,6 +75,24 @@ docker run --rm -p 8080:8080 webrtc
 |:---------|:------------|:--------|
 | `ADDR` | HTTP listen address | `:8080` |
 | `WS_ALLOWED_ORIGINS` | Comma-separated allowed origins; set to `*` for all | `localhost` |
+| `RTC_CONFIG_JSON` | JSON object passed to the browser as `window.__APP_CONFIG__.rtcConfig` for custom ICE/TURN config | built-in public STUN |
+
+Example `RTC_CONFIG_JSON`:
+
+```json
+{
+  "iceServers": [
+    { "urls": ["stun:stun.l.google.com:19302"] },
+    {
+      "urls": ["turn:turn.example.com:3478"],
+      "username": "demo-user",
+      "credential": "demo-password"
+    }
+  ]
+}
+```
+
+Health check endpoint: `GET /healthz`
 
 ## Project Structure
 
@@ -118,6 +136,13 @@ webrtc/
 - [Signaling Deep Dive](docs/signaling.md) — Signaling & room management details
 - [Roadmap](ROADMAP.md) — Development plan & progress tracking
 - [Contributing](CONTRIBUTING.md) — Development workflow & code standards
+
+## Current Guardrails
+
+- The signaling server now binds each WebSocket connection to a single client ID and room membership, instead of trusting later messages blindly.
+- Duplicate client IDs in the same room are rejected instead of replacing an existing connection.
+- WebSocket connections use read limits, deadlines, pong handling, and server-driven ping frames.
+- The browser uses perfect-negotiation style collision handling and explicit `hangup` signaling for more stable multi-peer Mesh calls.
 
 ## Roadmap
 
