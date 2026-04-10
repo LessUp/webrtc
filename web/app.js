@@ -9,6 +9,7 @@ import {
 import { createMediaController } from './app.media.js';
 import { createPeerController } from './app.peers.js';
 import { createSignalingController } from './app.signaling.js';
+import { createStatsController } from './app.stats.js';
 import { createUI, getElements } from './app.ui.js';
 
 const elements = getElements();
@@ -78,6 +79,8 @@ const signaling = createSignalingController({
   state: state,
   ui: ui
 });
+
+const stats = createStatsController(state);
 
 function bindEvents() {
   if (elements.joinBtn) {
@@ -172,6 +175,7 @@ function bindEvents() {
 }
 
 bindEvents();
+stats.start();
 ui.initCapabilityHints();
 ui.renderMembers([]);
 ui.updateControls();

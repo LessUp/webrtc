@@ -98,12 +98,42 @@ body {
 }
 
 .status__text {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   padding: 8px 12px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--chip-bg);
   font-weight: 650;
+}
+
+.status__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+}
+
+.status__dot--joined {
+  background: var(--success);
+}
+
+.status__dot--calling {
+  background: var(--primary);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.status__dot--connecting,
+.status__dot--reconnecting {
+  background: #f59e0b;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 .status__error {
@@ -150,6 +180,25 @@ body {
   flex-wrap: wrap;
 }
 
+@media (max-width: 480px) {
+  .form-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .form-row .label {
+    min-width: unset;
+  }
+
+  .form-row .input {
+    min-width: unset;
+  }
+
+  .form-row .button {
+    width: 100%;
+  }
+}
+
 .label {
   font-size: 13px;
   color: var(--muted);
@@ -174,6 +223,7 @@ body {
 
 .button {
   padding: 10px 12px;
+  min-height: 44px;
   border-radius: 12px;
   border: 1px solid var(--border);
   background: var(--button-bg);
@@ -182,6 +232,7 @@ body {
   user-select: none;
   transition: transform 0.06s ease, background 0.15s ease, border-color 0.15s ease,
     opacity 0.15s ease;
+  font-size: 14px;
 }
 
 .button:hover {
@@ -286,7 +337,7 @@ body {
 
 @media (min-width: 640px) {
   .videos {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   }
 }
 
@@ -311,6 +362,16 @@ body {
   display: block;
 }
 
+.video-tile__stats {
+  display: flex;
+  gap: 12px;
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
 .chat-log {
   height: 160px;
   overflow: auto;
@@ -320,6 +381,12 @@ body {
   background: var(--input-bg);
   font-size: 13px;
   line-height: 1.5;
+}
+
+@media (min-width: 640px) {
+  .chat-log {
+    height: 220px;
+  }
 }
 
 .chat-log > div {

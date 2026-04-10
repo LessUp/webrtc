@@ -42,13 +42,27 @@ export function createUI(options) {
     return state.roomState;
   }
 
+  function statusDotClass() {
+    if (state.peers.size > 0) {
+      return 'status__dot--calling';
+    }
+    if (state.roomState === 'joined') {
+      return 'status__dot--joined';
+    }
+    if (state.roomState === 'connecting' || state.roomState === 'reconnecting') {
+      return 'status__dot--connecting';
+    }
+    return '';
+  }
+
   function updateControls() {
     const joined = state.roomState === 'joined' || state.roomState === 'reconnecting';
     const activeCall = state.peers.size > 0;
     const localReady = !!state.localStream;
 
     if (elements.statusEl) {
-      elements.statusEl.textContent = roomStateText[roomStatus()] || roomStateText.idle;
+      var dotClass = statusDotClass();
+      elements.statusEl.innerHTML = '<span class="status__dot ' + dotClass + '"></span>' + (roomStateText[roomStatus()] || roomStateText.idle);
     }
     if (elements.joinBtn) {
       elements.joinBtn.textContent = state.roomState === 'idle' ? 'Join' : 'Leave';
@@ -160,13 +174,18 @@ export function createUI(options) {
     video.autoplay = true;
     video.playsInline = true;
 
+    var statsDiv = document.createElement('div');
+    statsDiv.className = 'video-tile__stats';
+
     tile.appendChild(label);
     tile.appendChild(video);
+    tile.appendChild(statsDiv);
     elements.videosEl.appendChild(tile);
 
     peer.tileEl = tile;
     peer.labelEl = label;
     peer.videoEl = video;
+    peer.statsEl = statsDiv;
     return video;
   }
 
@@ -194,6 +213,7 @@ export function createUI(options) {
     peer.videoEl = null;
     peer.tileEl = null;
     peer.labelEl = null;
+    peer.statsEl = null;
   }
 
   function initCapabilityHints() {
