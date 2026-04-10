@@ -28,8 +28,8 @@
         <h2 class="card__title">房间</h2>
         <div class="form-row">
           <span class="label">Room</span>
-          <input id="room" class="input" placeholder="输入房间名（例如 demo）" autocomplete="off">
-          <button id="join" class="button button--primary">Join</button>
+          <input id="room" class="input" placeholder="输入房间名（例如 demo）" autocomplete="off" aria-label="房间名">
+          <button id="join" class="button button--primary" aria-label="加入或离开房间">Join</button>
         </div>
         <div class="members">
           <div class="members__title">在线成员（点击可填入 Remote）</div>
@@ -44,18 +44,18 @@
         <h2 class="card__title">呼叫与控制</h2>
         <div class="form-row">
           <span class="label">Remote</span>
-          <input id="remote" class="input" placeholder="选择成员或手动输入" autocomplete="off">
-          <button id="call" class="button button--success">Call</button>
-          <button id="hangup" class="button button--danger">Hangup</button>
+          <input id="remote" class="input" placeholder="选择成员或手动输入" autocomplete="off" aria-label="远端成员 ID">
+          <button id="call" class="button button--success" aria-label="发起通话">Call</button>
+          <button id="hangup" class="button button--danger" aria-label="挂断通话">Hangup</button>
         </div>
         <div class="controls">
-          <button id="muteBtn" class="button">Mute</button>
-          <button id="cameraBtn" class="button">Camera Off</button>
-          <button id="screenBtn" class="button">Share Screen</button>
+          <button id="muteBtn" class="button" aria-label="静音切换">Mute</button>
+          <button id="cameraBtn" class="button" aria-label="摄像头切换">Camera Off</button>
+          <button id="screenBtn" class="button" aria-label="屏幕共享">Share Screen</button>
         </div>
         <div class="controls">
-          <button id="recStart" class="button">Start Rec</button>
-          <button id="recStop" class="button" disabled>Stop Rec</button>
+          <button id="recStart" class="button" aria-label="开始录制">Start Rec</button>
+          <button id="recStop" class="button" disabled aria-label="停止录制">Stop Rec</button>
         </div>
         <div class="footer">
           加入房间后，从左侧成员列表选择对端再发起呼叫。
