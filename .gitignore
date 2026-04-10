@@ -45,3 +45,6 @@ _site/
 .env
 .env.*
 *.local
+
+# TURN credentials (use turnserver.conf.example as template)
+turnserver.conf

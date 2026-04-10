@@ -78,7 +78,7 @@ description: WebRTC 示例项目各阶段开发计划与进度追踪
 
 - [x] **按钮状态管理**  
   - [x] 根据状态禁用/启用 `Join / Call / Hangup` 按钮，避免误触。
-  - [ ] 例如：
+  - [x] 例如：
     - 未加入房间：只能点 `Join`。
     - 已加入房间但未通话：可以点 `Call`，`Hangup` 禁用。
     - 通话中：`Call` 禁用，只能点 `Hangup`。
@@ -157,12 +157,12 @@ description: WebRTC 示例项目各阶段开发计划与进度追踪
 
 > 目标：在保持 Demo 定位的前提下，理解 TURN/HTTPS 和 Docker 打包的基本概念，方便在不同机器上演示。
 
-- [ ] **基础 TURN 支持（可选）**  
-  - [ ] 搭建或使用一个简单的 TURN 服务器（例如 coturn）。
-  - [ ] 在前端 `iceServers` 中增加 TURN 配置（注意不要在仓库中泄露真实凭证）。
+- [x] **基础 TURN 支持（可选）**
+  - [x] 搭建或使用一个简单的 TURN 服务器（例如 coturn）。
+  - [x] 在前端 `iceServers` 中增加 TURN 配置（注意不要在仓库中泄露真实凭证）。
 
-- [ ] **HTTPS / WSS（可选）**  
-  - [ ] 使用 Nginx/Caddy 等为本项目提供 HTTPS 反向代理，信令走 `wss://`。
+- [x] **HTTPS / WSS（可选）**
+  - [x] 使用 Nginx/Caddy 等为本项目提供 HTTPS 反向代理，信令走 `wss://`。
 
 - [x] **Docker 打包**  
   - [x] 编写多阶段 `Dockerfile`，包含 Go 服务与静态前端文件。
