@@ -78,7 +78,7 @@ func NewHubWithOptions(opts Options) *Hub {
 	return h
 }
 
-func (c *Client) identity() (string, string) {
+func (c *Client) identity() (id, room string) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.id, c.room
