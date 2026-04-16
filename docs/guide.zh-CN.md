@@ -1,129 +1,130 @@
 ---
 layout: default
-title: Technical Guide — WebRTC
-description: Architecture, frontend implementation, media controls, DataChannel, and recording
+title: 技术指南 — WebRTC
+description: 架构设计、前端实现、媒体控制、DataChannel 和录制功能
 ---
 
-[← Back to Home]({{ site.baseurl }}/) | [Documentation Index](README.md)
+[← 返回首页]({{ site.baseurl }}/) | [文档索引](README.zh-CN.md)
 
-# Technical Guide
+# 技术指南
 
-This document covers the architecture, signaling flow, and implementation details of the WebRTC demo project.
-
----
-
-## Table of Contents
-
-- [Quick Start](#quick-start)
-- [Architecture Overview](#architecture-overview)
-- [Signaling Server](#signaling-server)
-- [Frontend State Machine](#frontend-state-machine)
-- [Media Handling](#media-handling)
-- [PeerConnection Management](#peerconnection-management)
-- [DataChannel Chat](#datachannel-chat)
-- [Local Recording](#local-recording)
-- [Connection Stats](#connection-stats)
+本文档详细介绍 WebRTC 演示项目的架构、信令流程和实现细节。
 
 ---
 
-## Quick Start
+## 目录
 
-### Prerequisites
+- [快速开始](#快速开始)
+- [架构概览](#架构概览)
+- [信令服务器](#信令服务器)
+- [前端状态机](#前端状态机)
+- [媒体处理](#媒体处理)
+- [PeerConnection 管理](#peerconnection-管理)
+- [DataChannel 聊天](#datachannel-聊天)
+- [本地录制](#本地录制)
+- [连接统计](#连接统计)
+
+---
+
+## 快速开始
+
+### 环境要求
 
 - Go 1.22+
-- Chrome / Edge / Firefox (latest)
-- Docker (optional, for deployment)
+- Chrome / Edge / Firefox 最新版
+- Docker（可选，用于部署）
 
-### Local Development
+### 本地开发
 
 ```bash
-# Clone repository
+# 克隆仓库
 git clone https://github.com/LessUp/webrtc.git
 cd webrtc
 
-# Install dependencies
+# 安装依赖
 go mod tidy
 
-# Run server
+# 运行服务器
 go run ./cmd/server
 
-# Open browser
+# 打开浏览器
 open http://localhost:8080
 ```
 
-### Testing Flow
+### 测试流程
 
-1. Open two browser tabs at `http://localhost:8080`
-2. Enter the same **room name** in both tabs
-3. Click **Join** in both tabs
-4. Click the other user's ID from the member list
-5. Click **Call** to initiate the connection
-6. Grant camera/microphone permissions
-7. Enjoy your WebRTC call!
+1. 打开两个浏览器标签页，访问 `http://localhost:8080`
+2. 在两个标签页中输入相同的**房间名**
+3. 在两个标签页中点击 **Join**
+4. 点击成员列表中的对方 ID
+5. 点击 **Call** 发起连接
+6. 授予摄像头/麦克风权限
+7. 开始 WebRTC 通话！
 
 ---
 
-## Architecture Overview
+## 架构概览
 
-### Module Structure
+### 模块结构
 
 ```
 webrtc/
-├── cmd/server/          # HTTP + WebSocket entry point
-├── internal/signal/     # Signaling logic
-│   ├── hub.go           # Room management, message relay
-│   ├── hub_test.go      # Unit tests
-│   └── message.go       # Message types
-└── web/                 # Frontend (vanilla JS)
+├── cmd/server/          # HTTP + WebSocket 入口
+├── internal/signal/     # 信令逻辑
+│   ├── hub.go           # 房间管理、消息转发
+│   ├── hub_test.go      # 单元测试
+│   └── message.go       # 消息类型
+└── web/                 # 前端（原生 JS）
     ├── index.html       # UI
-    ├── app.js           # Main entry
-    ├── app.config.js    # Configuration, capabilities
-    ├── app.media.js     # Media handling
-    ├── app.peers.js     # PeerConnection management
-    ├── app.signaling.js # WebSocket signaling
-    ├── app.stats.js     # Connection stats
-    ├── app.ui.js        # UI rendering
-    └── styles.css       # Responsive styles
+    ├── app.js           # 主入口
+    ├── app.config.js    # 配置、能力检测
+    ├── app.media.js     # 媒体处理
+    ├── app.peers.js     # PeerConnection 管理
+    ├── app.signaling.js # WebSocket 信令
+    ├── app.stats.js     # 连接统计
+    ├── app.ui.js        # UI 渲染
+    └── styles.css       # 响应式样式
 ```
 
-### High-Level Interaction
+### 高级交互图
 
 ```
-┌──────────────────────────────────────────────────────┐
-│  Browser A                                           │
+┌─────────────────────────────────────────────────────┐
+│  浏览器 A                                            │
 │  ┌──────────┐    ┌──────────┐    ┌────────────────┐ │
 │  │  HTML UI  │──→│  app.js  │──→│  getUserMedia   │ │
 │  └──────────┘    └────┬─────┘    └──────┬─────────┘ │
 └───────────────────────┼─────────────────┼───────────┘
                         │ WebSocket       │ WebRTC P2P
                  ┌──────▼──────┐          │
-                 │  Go Server   │          │
+                 │  Go 信令服务  │          │
                  │ ┌──────────┐│          │
                  │ │Signal Hub││          │
+                 │ │ 房间管理   ││          │
                  │ └──────────┘│          │
                  └──────┬──────┘          │
                         │ WebSocket       │
 ┌───────────────────────┼─────────────────┼───────────┐
-│  Browser B            │                 │           │
+│  浏览器 B             │                 │           │
 │  ┌──────────┐    ┌────▼─────┐    ┌──────▼─────────┐│
 │  │  HTML UI  │──→│  app.js  │──→│  getUserMedia   ││
 │  └──────────┘    └──────────┘    └────────────────┘│
 └─────────────────────────────────────────────────────┘
 ```
 
-### Data Flow
+### 数据流
 
-| Flow | Path | Protocol | Description |
-|:-----|:-----|:---------|:------------|
-| **Signaling** | Browser ↔ Server | WebSocket | Offer/Answer/ICE relay |
-| **Media** | Browser ↔ Browser | WebRTC (SRTP) | Audio/video streams |
-| **DataChannel** | Browser ↔ Browser | WebRTC (SCTP) | Text chat messages |
+| 流向 | 路径 | 协议 | 说明 |
+|:-----|:-----|:-----|:-----|
+| **信令流** | 浏览器 ↔ 服务器 | WebSocket | Offer/Answer/ICE 转发 |
+| **媒体流** | 浏览器 ↔ 浏览器 | WebRTC (SRTP) | 音视频流 |
+| **数据通道** | 浏览器 ↔ 浏览器 | WebRTC (SCTP) | 文本聊天 |
 
 ---
 
-## Signaling Server
+## 信令服务器
 
-### Message Structure
+### 消息结构
 
 ```go
 type Message struct {
@@ -137,22 +138,22 @@ type Message struct {
 }
 ```
 
-### Message Types
+### 消息类型
 
-| Type | Direction | Description |
-|:-----|:----------|:------------|
-| `join` | Client → Server | Join room request |
-| `joined` | Server → Client | Join confirmation |
-| `leave` | Client → Server | Leave room request |
-| `offer` | Client ↔ Client | SDP offer |
-| `answer` | Client ↔ Client | SDP answer |
-| `candidate` | Client ↔ Client | ICE candidate |
-| `hangup` | Client ↔ Client | End call |
-| `room_members` | Server → Clients | Member list broadcast |
-| `error` | Server → Client | Protocol error |
-| `ping/pong` | Client ↔ Server | Heartbeat |
+| 类型 | 方向 | 说明 |
+|:-----|:-----|:-----|
+| `join` | 客户端 → 服务器 | 加入房间请求 |
+| `joined` | 服务器 → 客户端 | 加入确认 |
+| `leave` | 客户端 → 服务器 | 离开房间请求 |
+| `offer` | 客户端 ↔ 客户端 | SDP offer |
+| `answer` | 客户端 ↔ 客户端 | SDP answer |
+| `candidate` | 客户端 ↔ 客户端 | ICE candidate |
+| `hangup` | 客户端 ↔ 客户端 | 挂断通话 |
+| `room_members` | 服务器 → 客户端 | 成员列表广播 |
+| `error` | 服务器 → 客户端 | 协议错误 |
+| `ping/pong` | 客户端 ↔ 服务器 | 心跳保活 |
 
-### Hub Data Structure
+### Hub 数据结构
 
 ```go
 type Hub struct {
@@ -173,10 +174,10 @@ type Client struct {
 }
 ```
 
-### Signaling Flow (1-on-1)
+### 信令流程（一对一）
 
 ```
-Browser A              Signal Hub              Browser B
+浏览器 A              Signal Hub              浏览器 B
     │                      │                       │
     │──── join ────────────▶                       │
     │◀─── joined ───────────                       │
@@ -193,40 +194,40 @@ Browser A              Signal Hub              Browser B
     │◀═════════════════════╪═════ WebRTC P2P ═════▶│
 ```
 
-For detailed protocol specifications, see [Signaling Protocol](signaling.md).
+详细的协议规范请参阅 [信令协议](signaling.zh-CN.md)。
 
 ---
 
-## Frontend State Machine
+## 前端状态机
 
-### States
+### 状态定义
 
-| State | Description |
-|:------|:------------|
-| `idle` | Not connected to any room |
-| `connecting` | WebSocket connecting |
-| `joined` | In room, ready to call |
-| `reconnecting` | WebSocket reconnecting |
-| `calling` | Active peer connection(s) |
+| 状态 | 说明 |
+|:-----|:-----|
+| `idle` | 未连接到任何房间 |
+| `connecting` | WebSocket 连接中 |
+| `joined` | 已加入房间，可以发起通话 |
+| `reconnecting` | WebSocket 重连中 |
+| `calling` | 活跃的 PeerConnection |
 
-### State Transitions
+### 状态转换
 
 ```
-idle ──[connect]──▶ connecting ──[join success]──▶ joined
-  ▲                                                     │
-  │                                          [call start]
-  │                                                     ▼
-  └──[disconnect]── reconnecting ◀──[disconnect]── calling
+idle ──[连接]──▶ connecting ──[加入成功]──▶ joined
+  ▲                                                  │
+  │                                       [发起通话]
+  │                                                  ▼
+  └──[断开连接]── reconnecting ◀──[断开连接]── calling
 ```
 
-### Core State Variables
+### 核心状态变量
 
 ```javascript
 const state = {
-  myId: string,           // Local client ID
-  ws: WebSocket,          // WebSocket connection
-  roomId: string,         // Current room
-  roomState: 'idle',      // Connection state
+  myId: string,           // 本地客户端 ID
+  ws: WebSocket,          // WebSocket 连接
+  roomId: string,         // 当前房间
+  roomState: 'idle',      // 连接状态
   localStream: MediaStream,
   screenStream: MediaStream,
   usingScreen: boolean,
@@ -238,9 +239,9 @@ const state = {
 
 ---
 
-## Media Handling
+## 媒体处理
 
-### Getting Local Media
+### 获取本地媒体
 
 ```javascript
 async function ensureLocalMedia() {
@@ -257,10 +258,10 @@ async function ensureLocalMedia() {
 }
 ```
 
-### Mute / Camera Toggle
+### 静音 / 摄像头开关
 
 ```javascript
-// Mute/unmute audio
+// 静音/取消静音
 function toggleMute() {
   state.muted = !state.muted;
   state.localStream.getAudioTracks().forEach(track => {
@@ -268,7 +269,7 @@ function toggleMute() {
   });
 }
 
-// Camera on/off
+// 摄像头开关
 function toggleCamera() {
   state.cameraOff = !state.cameraOff;
   state.localStream.getVideoTracks().forEach(track => {
@@ -277,7 +278,7 @@ function toggleCamera() {
 }
 ```
 
-### Screen Sharing
+### 屏幕共享
 
 ```javascript
 async function startScreenShare() {
@@ -285,7 +286,7 @@ async function startScreenShare() {
   state.screenStream = stream;
   state.usingScreen = true;
 
-  // Replace video track in all peer connections
+  // 替换所有 PeerConnection 中的视频轨道
   const videoTrack = stream.getVideoTracks()[0];
   for (const peer of state.peers.values()) {
     const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
@@ -298,9 +299,9 @@ async function startScreenShare() {
 
 ---
 
-## PeerConnection Management
+## PeerConnection 管理
 
-### Creating a Peer
+### 创建 Peer
 
 ```javascript
 function ensurePeer(peerId) {
@@ -332,16 +333,16 @@ function ensurePeer(peerId) {
 }
 ```
 
-### Perfect Negotiation
+### 完美协商
 
-The project implements the "Perfect Negotiation" pattern to handle glare (simultaneous offers):
+项目实现了"完美协商"模式来处理同时发起 offer 的冲突：
 
 ```javascript
 async function applyDescription(peerId, description) {
   const peer = ensurePeer(peerId);
   const pc = peer.pc;
 
-  // Collision detection
+  // 冲突检测
   const offerCollision = description.type === 'offer' &&
     (peer.makingOffer || pc.signalingState !== 'stable');
 
@@ -356,27 +357,27 @@ async function applyDescription(peerId, description) {
     sendSignal({ type: 'answer', to: peerId, sdp: pc.localDescription });
   }
 
-  // Drain pending candidates
+  // 处理待处理的 candidates
   while (peer.pendingCandidates.length) {
     await pc.addIceCandidate(peer.pendingCandidates.shift());
   }
 }
 ```
 
-**Polite Peer Rule**: The peer with the lexicographically larger ID is "polite" and will defer when collisions occur.
+**礼貌对等端规则**：字典序较大的对等端 ID 是"礼貌"的，在冲突时会让步。
 
 ---
 
-## DataChannel Chat
+## DataChannel 聊天
 
-### Setup
+### 设置
 
 ```javascript
 function setupDataChannel(peer, channel) {
   peer.dc = channel;
 
   channel.onopen = () => {
-    appendChat(`[system] chat channel opened: ${peer.id}`);
+    appendChat(`[系统] 聊天频道已开启: ${peer.id}`);
   };
 
   channel.onmessage = e => {
@@ -384,12 +385,12 @@ function setupDataChannel(peer, channel) {
   };
 
   channel.onclose = () => {
-    appendChat(`[system] chat channel closed: ${peer.id}`);
+    appendChat(`[系统] 聊天频道已关闭: ${peer.id}`);
   };
 }
 ```
 
-### Sending Messages
+### 发送消息
 
 ```javascript
 function sendChat() {
@@ -404,25 +405,25 @@ function sendChat() {
   }
 
   if (!channels.length) {
-    setError('No chat channel available');
+    setError('没有可用的聊天频道');
     return;
   }
 
   channels.forEach(dc => dc.send(text));
-  appendChat(`me: ${text}`);
+  appendChat(`我: ${text}`);
   chatInput.value = '';
 }
 ```
 
 ---
 
-## Local Recording
+## 本地录制
 
-### Start Recording
+### 开始录制
 
 ```javascript
 function startRecording() {
-  const stream = getRecordStream(); // remote > screen > local
+  const stream = getRecordStream(); // 远程 > 屏幕 > 本地
   if (!stream) return;
 
   state.recordedChunks = [];
@@ -437,7 +438,7 @@ function startRecording() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `webrtc-recording-${Date.now()}.webm`;
+    a.download = `webrtc-录制-${Date.now()}.webm`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -448,35 +449,35 @@ function startRecording() {
 
 ---
 
-## Connection Stats
+## 连接统计
 
-The stats controller polls `RTCPeerConnection.getStats()` every 2 seconds:
+统计控制器每 2 秒轮询一次 `RTCPeerConnection.getStats()`：
 
-| Metric | Description |
-|:-------|:------------|
-| Video bitrate | Outbound video bitrate (kbps) |
-| Resolution | Outbound video resolution |
-| Audio loss | Inbound audio packet loss (%) |
-| RTT | Round-trip time (ms) |
-| Codec | Video codec name (VP8/VP9/H.264) |
-
----
-
-## Reading Guide
-
-Recommended reading order:
-
-1. **This document** — Overview and architecture
-2. **[Signaling Protocol](signaling.md)** — Deep dive into signaling protocol
-3. **[API Reference](api.md)** — Configuration and limits
-4. **Source code** — Follow along with the documentation:
-   - `internal/signal/hub.go` — Backend signaling
-   - `web/app.*.js` — Frontend modules
+| 指标 | 说明 |
+|:-----|:-----|
+| 视频码率 | 发送视频码率（kbps）|
+| 分辨率 | 发送视频分辨率 |
+| 音频丢包 | 接收音频丢包率（%）|
+| RTT | 往返时延（ms）|
+| 编解码器 | 视频编解码器名称（VP8/VP9/H.264）|
 
 ---
 
-## Related Documentation
+## 阅读指南
 
-- [Deployment Guide](deployment.md) — Production deployment
-- [Troubleshooting](troubleshooting.md) — Common issues
-- [Contributing](../CONTRIBUTING.md) — Development workflow
+推荐阅读顺序：
+
+1. **本文档** — 概览和架构
+2. **[信令协议](signaling.zh-CN.md)** — 信令协议详解
+3. **[API 参考](api.zh-CN.md)** — 配置和限制
+4. **源代码** — 配合文档阅读：
+   - `internal/signal/hub.go` — 后端信令
+   - `web/app.*.js` — 前端模块
+
+---
+
+## 相关文档
+
+- [部署指南](deployment.zh-CN.md) — 生产部署
+- [故障排查](troubleshooting.zh-CN.md) — 常见问题
+- [贡献指南](../CONTRIBUTING.md) — 开发工作流
