@@ -27,6 +27,9 @@ const (
 	PongWait          = 20 * time.Second
 	PingPeriod        = 15 * time.Second
 	MaxMessageSize    = 1 << 20
+	// Rate limiting: max messages per second per client
+	MaxMessagesPerSecond = 30
+	RateLimitBurst       = 50
 )
 
 var errClientClosed = errors.New("client closed")
@@ -52,6 +55,10 @@ type Client struct {
 	send      chan Message
 	closed    chan struct{}
 	closeOnce sync.Once
+	// Rate limiting
+	msgCount    int
+	msgWindow   time.Time
+	rateLimited bool
 }
 
 type Options struct {
@@ -78,7 +85,7 @@ func NewHubWithOptions(opts Options) *Hub {
 	return h
 }
 
-func (c *Client) identity() (id, room string) {
+func (c *Client) identity() (userID, userRoom string) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.id, c.room
@@ -95,6 +102,43 @@ func (c *Client) setRoom(room string) {
 	c.mu.Lock()
 	c.room = room
 	c.mu.Unlock()
+}
+
+// checkRateLimit implements token bucket rate limiting.
+// Returns true if the message should be allowed, false if rate limited.
+func (c *Client) checkRateLimit() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	now := time.Now()
+	// Reset window if more than 1 second has passed
+	if now.Sub(c.msgWindow) >= time.Second {
+		c.msgWindow = now
+		c.msgCount = 0
+		c.rateLimited = false
+	}
+
+	c.msgCount++
+
+	// Allow burst up to RateLimitBurst, then enforce MaxMessagesPerSecond
+	if c.msgCount > RateLimitBurst {
+		if !c.rateLimited {
+			c.rateLimited = true
+			log.Printf("signal: rate limiting client conn=%d", c.connID)
+		}
+		return false
+	}
+
+	// After burst, check per-second rate
+	if c.msgCount > MaxMessagesPerSecond && now.Sub(c.msgWindow) < time.Second {
+		if !c.rateLimited {
+			c.rateLimited = true
+			log.Printf("signal: rate limiting client conn=%d", c.connID)
+		}
+		return false
+	}
+
+	return true
 }
 
 func (c *Client) sendError(code, text string) error {
@@ -248,9 +292,17 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 	go client.writePump()
 
 	conn.SetReadLimit(MaxMessageSize)
-	_ = conn.SetReadDeadline(time.Now().Add(PongWait))
+	if err := conn.SetReadDeadline(time.Now().Add(PongWait)); err != nil {
+		log.Printf("signal: set initial read deadline failed conn=%d: %v", client.connID, err)
+		client.close()
+		return
+	}
 	conn.SetPongHandler(func(string) error {
-		return conn.SetReadDeadline(time.Now().Add(PongWait))
+		if err := conn.SetReadDeadline(time.Now().Add(PongWait)); err != nil {
+			log.Printf("signal: set pong read deadline failed conn=%d: %v", client.connID, err)
+			return err
+		}
+		return nil
 	})
 
 	for {
@@ -273,7 +325,11 @@ func (h *Hub) isOriginAllowed(r *http.Request) bool {
 	origin := r.Header.Get("Origin")
 	if origin == "" {
 		host := r.Host
-		return strings.HasPrefix(host, "localhost:") || strings.HasPrefix(host, "127.0.0.1:")
+		// Check for localhost with proper host:port matching
+		if isLocalhostHost(host) {
+			return true
+		}
+		return false
 	}
 	if len(h.allowedOrigins) == 0 {
 		u, err := url.Parse(origin)
@@ -281,10 +337,7 @@ func (h *Hub) isOriginAllowed(r *http.Request) bool {
 			return false
 		}
 		host := u.Hostname()
-		if host == "localhost" || host == "127.0.0.1" {
-			return true
-		}
-		return false
+		return isLocalhost(host)
 	}
 	for _, o := range h.allowedOrigins {
 		if o == origin {
@@ -294,7 +347,37 @@ func (h *Hub) isOriginAllowed(r *http.Request) bool {
 	return false
 }
 
+// isLocalhost checks if a hostname is localhost (IPv4, IPv6, or plain)
+func isLocalhost(host string) bool {
+	return host == "localhost" || host == "127.0.0.1" || host == "::1"
+}
+
+// isLocalhostHost checks if a host:port string refers to localhost
+func isLocalhostHost(hostPort string) bool {
+	// Handle plain hostnames without port
+	if hostPort == "localhost" || hostPort == "127.0.0.1" || hostPort == "[::1]" {
+		return true
+	}
+	// Handle host:port format
+	if strings.HasPrefix(hostPort, "localhost:") {
+		return true
+	}
+	if strings.HasPrefix(hostPort, "127.0.0.1:") {
+		return true
+	}
+	if strings.HasPrefix(hostPort, "[::1]:") {
+		return true
+	}
+	return false
+}
+
 func (h *Hub) handleMessage(client *Client, msg Message) error {
+	// Rate limit check
+	if !client.checkRateLimit() {
+		_ = client.sendError("rate_limited", "too many messages, please slow down")
+		return errors.New("rate limited")
+	}
+
 	switch msg.Type {
 	case "join":
 		return h.handleJoin(client, msg)
@@ -335,7 +418,7 @@ func (h *Hub) handleJoin(c *Client, msg Message) error {
 
 	c.setIdentity(id, room)
 	if err := h.addClient(c); err != nil {
-		c.setRoom("")
+		c.setIdentity("", "") // Clear both id and room on failure
 		_ = c.sendError(err.Code, err.Error())
 		return err
 	}
@@ -514,4 +597,11 @@ func (h *Hub) Close() {
 		client.close()
 		h.unregisterClient(client)
 	}
+}
+
+// IsClosed returns true if the hub has been closed.
+func (h *Hub) IsClosed() bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.closed
 }
