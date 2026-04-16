@@ -1,60 +1,135 @@
 # WebRTC
 
-[![Go CI](https://github.com/LessUp/webrtc/actions/workflows/ci.yml/badge.svg)](https://github.com/LessUp/webrtc/actions/workflows/ci.yml)
-[![Pages](https://github.com/LessUp/webrtc/actions/workflows/pages.yml/badge.svg)](https://lessup.github.io/webrtc/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)
-![WebRTC](https://img.shields.io/badge/WebRTC-Enabled-333333?logo=webrtc&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)
+<p align="center">
+  <a href="https://github.com/LessUp/webrtc/actions/workflows/ci.yml">
+    <img src="https://github.com/LessUp/webrtc/actions/workflows/ci.yml/badge.svg" alt="Go CI">
+  </a>
+  <a href="https://lessup.github.io/webrtc/">
+    <img src="https://github.com/LessUp/webrtc/actions/workflows/pages.yml/badge.svg" alt="Pages">
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT">
+  </a>
+  <img src="https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white" alt="Go">
+  <img src="https://img.shields.io/badge/WebRTC-Enabled-333333?logo=webrtc&logoColor=white" alt="WebRTC">
+  <img src="https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white" alt="Docker">
+</p>
 
-English | [简体中文](README.zh-CN.md) | [📖 Online Docs](https://lessup.github.io/webrtc/)
+<p align="center">
+  English | <a href="README.zh-CN.md">简体中文</a> | <a href="https://lessup.github.io/webrtc/">📖 Online Docs</a>
+</p>
 
-> **A production-ready WebRTC learning platform** — From basic peer-to-peer calls to advanced multi-party Mesh architecture, this project provides a complete, well-documented implementation for understanding WebRTC fundamentals through hands-on practice.
+<p align="center">
+  A production-ready WebRTC learning platform — from basic peer-to-peer calls to advanced multi-party Mesh architecture.
+</p>
 
-**Why This Project?**
-- 🎯 **Learning-Oriented**: Progressive complexity from 1-on-1 to multi-party calls
-- 🔒 **Security-First**: Origin validation, identity binding, connection limits
-- 📦 **Zero-Dependency Frontend**: Pure vanilla JavaScript, no frameworks required
-- 🐳 **Docker-Ready**: Multi-stage builds for minimal image size
-- 📚 **Comprehensive Docs**: Architecture diagrams, protocol specs, and troubleshooting guides
+---
 
-## ✨ Key Features
+## Table of Contents
 
-### Core Capabilities
-| Feature | Description | Status |
-|:--------|:------------|:-------|
-| **WebSocket Signaling** | Gorilla WebSocket for Offer/Answer/ICE Candidate relay with heartbeat, join acknowledgement, and explicit hangup | ✅ Production |
-| **Media Controls** | Mute/unmute, camera on/off, screen sharing (`getDisplayMedia`) | ✅ Production |
-| **DataChannel** | Peer-to-peer text chat without server relay | ✅ Production |
-| **Local Recording** | MediaRecorder captures audio/video streams, exports `.webm` for download | ✅ Production |
-| **Multi-party Mesh** | Room member list broadcast, multi-PeerConnection management, grid video layout | ✅ Production |
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Why This Project?](#why-this-project)
+- [Architecture](#architecture)
+- [Documentation](#documentation)
+- [Configuration](#configuration)
+- [Deployment](#deployment)
+- [Contributing](#contributing)
+- [License](#license)
 
-### Security & Reliability
-| Feature | Description | Status |
-|:--------|:------------|:-------|
-| **Origin Validation** | Whitelist-based CORS protection for WebSocket connections | ✅ Production |
-| **Identity Binding** | WebSocket connections bound to single client ID and room membership | ✅ Production |
-| **Connection Limits** | Room/client limits, duplicate ID rejection, auto-reconnection | ✅ Production |
-| **Perfect Negotiation** | Collision handling and explicit hangup signaling for stable Mesh calls | ✅ Production |
+---
 
-### DevOps & Deployment
-| Feature | Description | Status |
-|:--------|:------------|:-------|
-| **Docker** | Multi-stage Dockerfile, Go compilation + static frontend packaging | ✅ Production |
-| **CI/CD** | GitHub Actions with golangci-lint, multi-version testing, Pages deployment | ✅ Production |
-| **Health Checks** | `/healthz` endpoint for container orchestration | ✅ Production |
+## Features
 
-## 🏗️ Architecture Overview
+| Feature | Description |
+|:--------|:------------|
+| **🌐 WebSocket Signaling** | Gorilla WebSocket with heartbeat, room management, and message relay |
+| **👥 Multi-party Mesh** | Up to 50 participants per room with automatic peer management |
+| **💬 DataChannel Chat** | Peer-to-peer text messaging without server relay |
+| **🎥 Media Controls** | Mute/unmute, camera toggle, screen sharing |
+| **📹 Local Recording** | Browser-side MediaRecorder with WebM export |
+| **🔒 Security** | Origin validation, identity binding, rate limiting |
+| **🐳 Docker Ready** | Multi-stage builds with HTTPS/TURN support |
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- Go 1.22+
+- Modern browser (Chrome 90+, Firefox 88+, Safari 14+)
+- Docker (optional)
+
+### Run Locally
+
+```bash
+git clone https://github.com/LessUp/webrtc.git
+cd webrtc
+go mod tidy
+go run ./cmd/server
+```
+
+Open http://localhost:8080 and start calling!
+
+### Run with Docker
+
+```bash
+docker build -t webrtc .
+docker run --rm -p 8080:8080 webrtc
+```
+
+### Run with Docker Compose (Production)
+
+```bash
+export DOMAIN=your-domain.com
+docker compose up -d
+```
+
+Visit `https://your-domain.com` with automatic HTTPS.
+
+---
+
+## Why This Project?
+
+- **🎓 Learning-Oriented** — Progressive complexity from 1-on-1 to multi-party
+- **🔐 Security-First** — Origin validation, identity binding, connection limits
+- **📦 Zero-Dependency Frontend** — Pure vanilla JavaScript, no frameworks
+- **🚀 Docker-Ready** — Multi-stage builds for minimal image size
+- **📝 Well-Documented** — Bilingual docs (EN/ZH), architecture diagrams, troubleshooting guides
+
+---
+
+## Architecture
+
+### Module Structure
+
+```
+webrtc/
+├── cmd/server/              # HTTP + WebSocket entry point
+├── internal/signal/         # Signaling logic
+│   ├── hub.go               # Room management, message relay
+│   ├── hub_test.go          # Unit tests
+│   └── message.go           # Message type definitions
+├── web/                     # Frontend (vanilla JS)
+│   ├── index.html           # UI
+│   ├── app.js               # Main entry
+│   ├── app.*.js             # Modular components
+│   └── styles.css           # Responsive styles
+├── docs/                    # Documentation (EN/ZH)
+├── changelog/               # Version history
+└── .github/workflows/       # CI/CD
+```
 
 ### System Architecture
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│  Browser A                                            │
-│  ┌──────────┐    ┌──────────┐    ┌────────────────┐  │
-│  │  HTML UI  │──→│  app.js  │──→│  getUserMedia   │  │
-│  └──────────┘    └────┬─────┘    └──────┬─────────┘  │
-└───────────────────────┼─────────────────┼────────────┘
+│  Browser A                                           │
+│  ┌──────────┐    ┌──────────┐    ┌────────────────┐ │
+│  │  HTML UI  │──→│  app.js  │──→│  getUserMedia   │ │
+│  └──────────┘    └────┬─────┘    └──────┬─────────┘ │
+└───────────────────────┼─────────────────┼───────────┘
                         │ WebSocket       │ WebRTC P2P
                  ┌──────▼──────┐          │
                  │  Go Server   │          │
@@ -63,190 +138,156 @@ English | [简体中文](README.zh-CN.md) | [📖 Online Docs](https://lessup.gi
                  │ └──────────┘│          │
                  └──────┬──────┘          │
                         │ WebSocket       │
-┌───────────────────────┼─────────────────┼────────────┐
-│  Browser B            │                 │            │
-│  ┌──────────┐    ┌────▼─────┐    ┌──────▼─────────┐ │
-│  │  HTML UI  │──→│  app.js  │──→│  getUserMedia   │ │
-│  └──────────┘    └──────────┘    └────────────────┘  │
-└──────────────────────────────────────────────────────┘
+┌───────────────────────┼─────────────────┼───────────┐
+│  Browser B            │                 │           │
+│  ┌──────────┐    ┌────▼─────┐    ┌──────▼─────────┐│
+│  │  HTML UI  │──→│  app.js  │──→│  getUserMedia   ││
+│  └──────────┘    └──────────┘    └────────────────┘│
+└─────────────────────────────────────────────────────┘
 ```
 
-### Data Flow
+| Flow | Path | Description |
+|:-----|:-----|:------------|
+| **Signaling** | Browser ↔ WebSocket `/ws` ↔ Hub | Offer/Answer/ICE relay |
+| **Media** | Browser ↔ WebRTC P2P ↔ Browser | Audio/video streams |
+| **DataChannel** | Browser ↔ WebRTC P2P ↔ Browser | Text chat |
 
-| Flow Type | Path | Description |
-|:-----------|:-----|:------------|
-| **Signaling** | Browser → WebSocket `/ws` → Signal Hub → Browser | Offer/Answer/ICE Candidate relay |
-| **Media** | Browser ←→ WebRTC P2P ←→ Browser | Audio/Video streams |
-| **DataChannel** | Browser ←→ WebRTC P2P ←→ Browser | Text chat, file transfer |
+---
 
-## 🚀 Quick Start
+## Documentation
 
-### Prerequisites
+Complete documentation available in English and 简体中文:
 
-- **Go**: 1.22 or later
-- **Browser**: Chrome / Edge / Firefox (latest version)
-- **Docker** (optional): For containerized deployment
+| Document | Description |
+|:---------|:------------|
+| **📘 [Guide](docs/guide.md)** | Architecture, implementation details |
+| **🚀 [Deployment](docs/deployment.md)** | Docker, HTTPS, TURN setup |
+| **📡 [Signaling](docs/signaling.md)** | WebSocket protocol specification |
+| **🔧 [API Reference](docs/api.md)** | Configuration, environment variables |
+| **🔍 [Troubleshooting](docs/troubleshooting.md)** | Common issues and solutions |
 
-### Option 1: Native Go Runtime
+📖 **Online Docs**: https://lessup.github.io/webrtc/
 
-```bash
-# Clone the repository
-git clone https://github.com/LessUp/webrtc.git
-cd webrtc
+---
 
-# Install dependencies
-go mod tidy
-
-# Start the server
-go run ./cmd/server
-
-# Server will be available at http://localhost:8080
-```
-
-### Option 2: Docker Deployment
-
-```bash
-# Build the Docker image
-docker build -t webrtc .
-
-# Run the container
-docker run --rm -p 8080:8080 webrtc
-
-# Access the application at http://localhost:8080
-```
-
-### Testing the Application
-
-1. Open two browser tabs at `http://localhost:8080`
-2. In both tabs, enter the same **room name** and click **Join**
-3. In one tab, click the other user's ID from the member list
-4. Click **Call** to initiate the connection
-5. Grant camera/microphone permissions when prompted
-6. You should now see the remote video stream
-
-> **Note**: If testing on the same machine, you may need to disable "HTTPS-Only" mode or use incognito windows.
-
-## ⚙️ Configuration
+## Configuration
 
 ### Environment Variables
 
-| Variable | Description | Default | Example |
-|:---------|:------------|:--------|:--------|
-| `ADDR` | HTTP server listen address | `:8080` | `:8080`, `0.0.0.0:8080` |
-| `WS_ALLOWED_ORIGINS` | Comma-separated allowed origins for WebSocket connections | `localhost` | `localhost,example.com` or `*` |
-| `RTC_CONFIG_JSON` | Custom ICE/TURN configuration as JSON | Built-in public STUN | See example below |
+| Variable | Default | Description |
+|:---------|:--------|:------------|
+| `ADDR` | `:8080` | HTTP listen address |
+| `WS_ALLOWED_ORIGINS` | `*` | Comma-separated origins; `*` for all |
+| `RTC_CONFIG_JSON` | Public STUN | JSON ICE/TURN config passed to browser |
 
 ### Custom ICE/TURN Configuration
-
-Set the `RTC_CONFIG_JSON` environment variable to configure custom STUN/TURN servers:
 
 ```bash
 export RTC_CONFIG_JSON='{
   "iceServers": [
     { "urls": ["stun:stun.l.google.com:19302"] },
-    {
-      "urls": ["turn:turn.example.com:3478"],
-      "username": "demo-user",
-      "credential": "demo-password"
-    }
+    { "urls": ["turn:turn.example.com:3478"], "username": "user", "credential": "pass" }
   ]
 }'
 ```
 
-### Health Check
+---
 
-The server provides a health check endpoint for container orchestration:
+## Deployment
 
-```bash
-curl http://localhost:8080/healthz
-# Returns: OK
+### Production Checklist
+
+- [ ] Set `WS_ALLOWED_ORIGINS` to your domain
+- [ ] Configure TURN server for NAT traversal
+- [ ] Enable HTTPS (Caddy handles this automatically)
+- [ ] Set up monitoring and logging
+
+### Docker Compose (Recommended)
+
+```yaml
+# docker-compose.yml
+services:
+  webrtc:
+    build: .
+    environment:
+      - WS_ALLOWED_ORIGINS=yourdomain.com
+      - RTC_CONFIG_JSON={"iceServers":[{"urls":"turn:yourdomain.com:3478"...}]}
+  
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+  
+  coturn:
+    image: coturn/coturn:latest
+    network_mode: host
 ```
 
-## 📁 Project Structure
-
-```
-webrtc/
-├── cmd/server/              # HTTP + WebSocket entry point
-│   └── main.go              # Server startup, graceful shutdown, origin config
-├── internal/signal/         # Signaling logic
-│   ├── hub.go               # Room management, message relay, client lifecycle
-│   ├── hub_test.go          # Unit tests
-│   └── message.go           # Message type definitions
-├── web/                     # Browser frontend
-│   ├── index.html           # UI
-│   ├── app.js               # WebRTC & signaling logic (Mesh multi-party)
-│   └── styles.css           # Responsive styles (light/dark theme)
-├── docs/                    # Technical documentation
-│   ├── guide.md             # Architecture, frontend, media, recording
-│   └── signaling.md         # Signaling protocol deep dive
-├── .github/workflows/       # CI/CD pipelines
-│   ├── ci.yml               # Go build + test + lint
-│   └── pages.yml            # GitHub Pages deployment
-├── changelog/               # Change logs
-├── Dockerfile               # Multi-stage build
-├── .golangci.yml            # Linter configuration
-└── go.mod                   # Go module definition
-```
-
-## 🛠️ Tech Stack
-
-| Category | Technology | Purpose |
-|:---------|:-----------|:--------|
-| **Backend** | Go 1.22+, net/http, Gorilla WebSocket | Signaling server, WebSocket handling |
-| **Frontend** | HTML5 + Vanilla JavaScript + CSS3 | Zero-dependency browser UI |
-| **Media** | WebRTC APIs | getUserMedia, RTCPeerConnection, DataChannel, MediaRecorder |
-| **Container** | Docker (multi-stage) | Minimal image size, easy deployment |
-| **CI/CD** | GitHub Actions | golangci-lint, multi-version testing, Pages deployment |
-
-## 📚 Documentation
-
-| Document | Description |
-|:---------|:------------|
-| [Technical Guide](docs/guide.md) | Architecture, frontend implementation, media controls, recording |
-| [Signaling Deep Dive](docs/signaling.md) | Signaling protocol, room management, message flow |
-| [Roadmap](ROADMAP.md) | Development plan, progress tracking, future features |
-| [Contributing](CONTRIBUTING.md) | Development workflow, code standards, PR guidelines |
-
-## 🔒 Security Features
-
-This project implements several security best practices:
-
-- **Identity Binding**: Each WebSocket connection is bound to a single client ID and room membership
-- **Duplicate Rejection**: Duplicate client IDs in the same room are rejected
-- **Connection Limits**: Room and client limits prevent resource exhaustion
-- **Origin Validation**: Whitelist-based CORS protection for WebSocket connections
-- **Perfect Negotiation**: Collision handling and explicit hangup signaling for stable Mesh calls
-- **WebSocket Hardening**: Read limits, deadlines, pong handling, server-driven ping frames
-
-## 🗺️ Roadmap
-
-### Completed ✅
-- [x] 1-on-1 call with status display, error handling, heartbeat
-- [x] Mute/camera/screen sharing, DataChannel chat, local recording
-- [x] Room member list, auto-call prompt, multi-party Mesh
-- [x] Docker multi-stage build & deployment
-
-### In Progress 🚧
-- [ ] TURN support (coturn)
-- [ ] HTTPS/WSS reverse proxy
-
-### Future 🔮
-- [ ] Multi-party calls via SFU
-- [ ] End-to-end encryption
-- [ ] Mobile app support
-
-## 🤝 Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
-- Development workflow
-- Code standards
-- Commit message format
-- Pull request process
-
-## 📄 License
-
-This project is licensed under the [MIT License](LICENSE).
+See [Deployment Guide](docs/deployment.md) for detailed instructions.
 
 ---
 
-**Made with ❤️ by the LessUp Team**
+## Contributing
+
+We welcome contributions! Please see:
+
+- [Contributing Guidelines](CONTRIBUTING.md) — Setup and workflow
+- [Roadmap](ROADMAP.md) — Future plans
+- [Changelog](CHANGELOG.md) — Version history
+
+### Development Setup
+
+```bash
+# Install dependencies
+go mod tidy
+
+# Run tests
+go test -race ./...
+
+# Run linter
+golangci-lint run
+
+# Start with hot reload
+air
+```
+
+---
+
+## Tech Stack
+
+| Category | Technology |
+|:---------|:-----------|
+| **Backend** | Go 1.22+, net/http, Gorilla WebSocket |
+| **Frontend** | HTML5 + Vanilla JavaScript + CSS3 |
+| **Media** | WebRTC APIs (getUserMedia, RTCPeerConnection, DataChannel) |
+| **Container** | Docker (multi-stage) |
+| **CI/CD** | GitHub Actions |
+
+---
+
+## Security
+
+- Origin whitelist validation
+- Server-verified client identities  
+- Connection limits (50 clients/room, 1000 rooms)
+- Input validation and sanitization
+- See [Security Policy](.github/SECURITY.md)
+
+---
+
+## License
+
+[MIT License](LICENSE) © [LessUp](https://github.com/LessUp)
+
+---
+
+<p align="center">
+  Made with ❤️ by <a href="https://github.com/LessUp">LessUp</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/LessUp/webrtc/stargazers">
+    <img src="https://img.shields.io/github/stars/LessUp/webrtc?style=social" alt="GitHub Stars">
+  </a>
+</p>
