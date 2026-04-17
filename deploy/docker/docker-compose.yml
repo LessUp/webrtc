@@ -1,6 +1,8 @@
 services:
   webrtc:
-    build: .
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
     ports:
       - "8080:8080"
     environment:
@@ -15,7 +17,7 @@ services:
       - "443:443"
       - "443:443/udp"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../web/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     environment:

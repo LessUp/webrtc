@@ -4,6 +4,7 @@ export function createSignalingController(options) {
   const peerController = options.peerController;
   const reconnectDelaysMs = options.reconnectDelaysMs;
   const state = options.state;
+  const statsController = options.statsController;
   const ui = options.ui;
 
   function scheduleReconnect() {
@@ -50,7 +51,13 @@ export function createSignalingController(options) {
     };
 
     ws.onmessage = function (event) {
-      const msg = JSON.parse(event.data);
+      var msg;
+      try {
+        msg = JSON.parse(event.data);
+      } catch (parseErr) {
+        console.error('signal: failed to parse message:', parseErr);
+        return;
+      }
       switch (msg.type) {
         case 'joined':
           state.reconnectAttempts = 0;
@@ -140,6 +147,9 @@ export function createSignalingController(options) {
   }
 
   function leaveRoom() {
+    if (statsController) {
+      statsController.stop();
+    }
     media.stopRecording();
     peerController.closeAllPeers(true);
     if (state.usingScreen) {

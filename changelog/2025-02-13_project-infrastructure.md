@@ -1,4 +1,0 @@
-# 2025-02-13 项目基础设施优化
-
-## 新增
-- README 添加标准化 badges（License、Go、WebRTC、Docker）

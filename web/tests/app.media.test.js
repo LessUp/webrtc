@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createMediaController } from '../app.media.js';
+import { createMediaController } from "../src/controllers/media.js";
 
 function createMockState(overrides) {
   return Object.assign({

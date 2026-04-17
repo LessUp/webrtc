@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createUI, getElements } from '../app.ui.js';
+import { createUI, getElements } from "../src/controllers/ui.js";
 
 function createMockState(overrides) {
   return Object.assign({

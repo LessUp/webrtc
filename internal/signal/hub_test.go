@@ -10,6 +10,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const testRoom = "room1"
+
 func TestMain(m *testing.M) {
 	log.SetOutput(io.Discard)
 	os.Exit(m.Run())
@@ -81,19 +83,19 @@ func TestIsOriginAllowed(t *testing.T) {
 func TestHubAddClientBroadcastsMembers(t *testing.T) {
 	h := NewHub()
 
-	c1 := newTestClient("a", "room1", 4)
-	c2 := newTestClient("b", "room1", 4)
+	c1 := newTestClient("a", testRoom, 4)
+	c2 := newTestClient("b", testRoom, 4)
 
 	if err := h.addClient(c1); err != nil {
 		t.Fatalf("addClient(c1) error: %v", err)
 	}
-	h.broadcastMembers("room1")
+	h.broadcastMembers(testRoom)
 	drainMessages(c1.send)
 
 	if err := h.addClient(c2); err != nil {
 		t.Fatalf("addClient(c2) error: %v", err)
 	}
-	h.broadcastMembers("room1")
+	h.broadcastMembers(testRoom)
 
 	select {
 	case msg := <-c1.send:
@@ -124,7 +126,7 @@ func TestHubAddClientBroadcastsMembers(t *testing.T) {
 
 func TestHubRemoveClientUpdatesMembersAndDeletesEmptyRoom(t *testing.T) {
 	h := NewHub()
-	room := "room1"
+	room := testRoom
 
 	c1 := newTestClient("a", room, 4)
 	c2 := newTestClient("b", room, 4)
@@ -162,7 +164,7 @@ func TestHubRemoveClientUpdatesMembersAndDeletesEmptyRoom(t *testing.T) {
 
 func TestHubForwardSendsToTargetClient(t *testing.T) {
 	h := NewHub()
-	room := "room1"
+	room := testRoom
 
 	src := newTestClient("a", room, 4)
 	dst := newTestClient("b", room, 1)
@@ -186,7 +188,7 @@ func TestHubForwardSendsToTargetClient(t *testing.T) {
 func TestHubAddClientRejectsEmptyRoomOrID(t *testing.T) {
 	h := NewHub()
 
-	if err := h.addClient(newTestClient("", "room1", 4)); err == nil {
+	if err := h.addClient(newTestClient("", testRoom, 4)); err == nil {
 		t.Fatal("expected empty id to be rejected")
 	}
 	if len(h.rooms) != 0 {
@@ -204,15 +206,15 @@ func TestHubAddClientRejectsEmptyRoomOrID(t *testing.T) {
 func TestHubRemoveClientIdempotent(t *testing.T) {
 	h := NewHub()
 
-	c := newTestClient("a", "room1", 4)
+	c := newTestClient("a", testRoom, 4)
 	if err := h.addClient(c); err != nil {
 		t.Fatalf("addClient error: %v", err)
 	}
-	h.broadcastMembers("room1")
+	h.broadcastMembers(testRoom)
 	drainMessages(c.send)
 
 	h.removeClient(c)
-	if _, ok := h.rooms["room1"]; ok {
+	if _, ok := h.rooms[testRoom]; ok {
 		t.Fatalf("room should be deleted after last member leaves")
 	}
 
@@ -232,7 +234,7 @@ func TestHubForwardToNonExistentRoom(t *testing.T) {
 
 func TestHubForwardToNonExistentClient(t *testing.T) {
 	h := NewHub()
-	room := "room1"
+	room := testRoom
 	c := newTestClient("a", room, 4)
 	if err := h.addClient(c); err != nil {
 		t.Fatalf("addClient error: %v", err)
@@ -247,7 +249,7 @@ func TestHubForwardToNonExistentClient(t *testing.T) {
 func TestHubMultipleRoomsIsolation(t *testing.T) {
 	h := NewHub()
 
-	c1 := newTestClient("a", "room1", 4)
+	c1 := newTestClient("a", testRoom, 4)
 	c2 := newTestClient("b", "room2", 4)
 
 	if err := h.addClient(c1); err != nil {
@@ -330,7 +332,7 @@ func TestHubMaxClientsPerRoomLimit(t *testing.T) {
 
 func TestHubForwardFailsWhenBufferFull(t *testing.T) {
 	h := NewHub()
-	room := "room1"
+	room := testRoom
 
 	src := newTestClient("a", room, 4)
 	dst := newTestClient("b", room, 1)
@@ -386,8 +388,8 @@ func TestNewHubWithOptionsCopiesSlice(t *testing.T) {
 
 func TestHubRejectsDuplicateClientID(t *testing.T) {
 	h := NewHub()
-	first := newTestClient("dup", "room1", 4)
-	second := newTestClient("dup", "room1", 4)
+	first := newTestClient("dup", testRoom, 4)
+	second := newTestClient("dup", testRoom, 4)
 
 	if err := h.addClient(first); err != nil {
 		t.Fatalf("unexpected first add error: %v", err)
@@ -395,7 +397,7 @@ func TestHubRejectsDuplicateClientID(t *testing.T) {
 	if err := h.addClient(second); err == nil {
 		t.Fatal("expected duplicate id to be rejected")
 	}
-	if h.rooms["room1"]["dup"] != first {
+	if h.rooms[testRoom]["dup"] != first {
 		t.Fatal("original client should remain registered")
 	}
 }
@@ -414,7 +416,7 @@ func TestHandleJoinAllowsHumanReadableRoomNames(t *testing.T) {
 }
 
 func TestClientCloseHandlesZeroValueConn(t *testing.T) {
-	client := newTestClient("a", "room1", 1)
+	client := newTestClient("a", testRoom, 1)
 
 	client.close()
 	select {
@@ -428,7 +430,7 @@ func TestClientCloseHandlesZeroValueConn(t *testing.T) {
 
 func TestHubRemoveClientDoesNotRemoveReplacementConnection(t *testing.T) {
 	h := NewHub()
-	room := "room1"
+	room := testRoom
 	first := newTestClient("dup", room, 4)
 	second := newTestClient("dup", room, 4)
 	h.rooms[room] = map[string]*Client{"dup": second}

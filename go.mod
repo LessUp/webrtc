@@ -1,4 +1,4 @@
-module lessup/webrtc
+module github.com/LessUp/webrtc
 
 go 1.22
 

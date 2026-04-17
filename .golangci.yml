@@ -14,6 +14,13 @@ linters:
     - revive
     - misspell
     - prealloc
+    - bodyclose      # HTTP body close check
+    - noctx          # context.Context check
+    - goconst        # Repeated string constants
+    - gosec          # Security issues
+    - errorlint      # Error wrapping best practice
+    - tparallel      # Test parallelization
+    - unparam        # Unused parameters
 
 linters-settings:
   gocritic:
@@ -37,7 +44,16 @@ linters-settings:
         disabled: true
   misspell:
     locale: US
+  gosec:
+    severity: medium
+    confidence: medium
 
 issues:
   max-issues-per-linter: 50
   max-same-issues: 5
+  exclude-rules:
+    # Exclude some linters from running on tests files
+    - path: _test\.go
+      linters:
+        - gosec
+        - errcheck

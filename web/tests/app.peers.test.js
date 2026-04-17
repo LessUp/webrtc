@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createPeerController } from '../app.peers.js';
+import { createPeerController } from "../src/controllers/peers.js";
 
 function createMockState(overrides) {
   return Object.assign({

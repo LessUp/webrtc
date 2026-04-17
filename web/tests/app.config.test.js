@@ -6,7 +6,7 @@ import {
   createClientId,
   getCapabilities,
   getRtcConfig
-} from '../app.config.js';
+} from "../src/config.js";
 
 describe('app.config', function () {
   describe('DEFAULT_RTC_CONFIG', function () {
