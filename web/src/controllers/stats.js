@@ -1,6 +1,7 @@
 export function createStatsController(state) {
   var pollInterval = null;
-  var prevStats = new Map();
+  // Use WeakMap to automatically clean up when peer connections are closed
+  var prevStats = new WeakMap();
 
   function formatBitrate(bytes, deltaMs) {
     if (deltaMs <= 0 || bytes < 0) return '--';
@@ -132,7 +133,10 @@ export function createStatsController(state) {
       clearInterval(pollInterval);
       pollInterval = null;
     }
-    prevStats.clear();
+    // WeakMap doesn't have clear(), but entries are automatically
+    // cleaned up when peer connections are garbage collected.
+    // We create a new WeakMap to effectively clear it.
+    prevStats = new WeakMap();
   }
 
   return {

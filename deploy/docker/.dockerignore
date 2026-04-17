@@ -1,0 +1,25 @@
+# Git
+.git
+.gitignore
+
+# GitHub
+.github
+
+# Documentation
+*.md
+docs/
+specs/
+
+# Testing
+e2e/
+web/tests/
+.coverage.out
+coverage.html
+
+# Development
+.env
+.air.toml
+Makefile
+
+# CI/CD (not needed in build)
+.github/workflows/*.yml

@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	sig "lessup/webrtc/internal/signal"
+	sig "github.com/LessUp/webrtc/internal/signal"
 )
 
 type appConfig struct {
@@ -49,6 +49,16 @@ func loadAppConfig() appConfig {
 	return appConfig{RTCConfig: json.RawMessage(raw)}
 }
 
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		next.ServeHTTP(w, r)
+	})
+}
+
 func configJSHandler(cfg appConfig) http.HandlerFunc {
 	payload, err := json.Marshal(cfg)
 	if err != nil {
@@ -59,7 +69,9 @@ func configJSHandler(cfg appConfig) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
-		_, _ = io.WriteString(w, body)
+		if _, err := io.WriteString(w, body); err != nil {
+			log.Printf("server: config.js write error: %v", err)
+		}
 	}
 }
 
@@ -82,13 +94,18 @@ func main() {
 	mux.HandleFunc("/config.js", configJSHandler(appCfg))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		if hub.IsClosed() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = io.WriteString(w, "unavailable\n")
+			return
+		}
 		_, _ = io.WriteString(w, "ok\n")
 	})
 	mux.Handle("/", http.FileServer(http.Dir("web")))
 
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           mux,
+		Handler:           securityHeaders(mux),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,

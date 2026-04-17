@@ -5,12 +5,12 @@ import {
   createClientId,
   getCapabilities,
   getRtcConfig
-} from './app.config.js';
-import { createMediaController } from './app.media.js';
-import { createPeerController } from './app.peers.js';
-import { createSignalingController } from './app.signaling.js';
-import { createStatsController } from './app.stats.js';
-import { createUI, getElements } from './app.ui.js';
+} from '../config.js';
+import { createMediaController } from '../controllers/media.js';
+import { createPeerController } from '../controllers/peers.js';
+import { createSignalingController } from '../controllers/signaling.js';
+import { createStatsController } from '../controllers/stats.js';
+import { createUI, getElements } from '../controllers/ui.js';
 
 const elements = getElements();
 const capabilities = getCapabilities();
@@ -63,6 +63,8 @@ const media = createMediaController({
   ui: ui
 });
 
+const stats = createStatsController(state);
+
 const peers = createPeerController({
   media: media,
   rtcConfig: rtcConfig,
@@ -77,10 +79,9 @@ const signaling = createSignalingController({
   peerController: peers,
   reconnectDelaysMs: RECONNECT_DELAYS_MS,
   state: state,
+  statsController: stats,
   ui: ui
 });
-
-const stats = createStatsController(state);
 
 function bindEvents() {
   if (elements.joinBtn) {
@@ -175,7 +176,7 @@ function bindEvents() {
 }
 
 bindEvents();
-stats.start();
 ui.initCapabilityHints();
+stats.start();
 ui.renderMembers([]);
 ui.updateControls();

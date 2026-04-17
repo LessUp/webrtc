@@ -1,21 +1,72 @@
+# WebRTC - GitHub Pages Configuration
+# https://lessup.github.io/webrtc
+
 title: WebRTC
+subtitle: Go + WebRTC 实时音视频示例
+email: 
 description: >-
-  基于 Go 的 WebRTC 实时音视频示例项目 —— WebSocket 信令 · 房间管理 · 点对点音视频 ·
-  屏幕共享 · DataChannel 文本聊天 · 本地录制 · 多人 Mesh 通话 · Docker 部署
+  基于 Go 的 WebRTC 实时音视频示例项目 —— WebSocket 信令 · 房间管理 · 
+  点对点音视频 · 屏幕共享 · DataChannel 文本聊天 · 本地录制 · 多人 Mesh 通话 · Docker 部署
+
+# Site settings
 url: https://lessup.github.io
 baseurl: /webrtc
+repository: LessUp/webrtc
+
+# Theme
 remote_theme: pages-themes/cayman@v0.2.0
 
+# Plugins
 plugins:
   - jekyll-remote-theme
   - jekyll-seo-tag
+  - jekyll-sitemap
+  - jekyll-relative-links
 
-repository: LessUp/webrtc
-show_downloads: false
+# SEO & Social
+author:
+  name: LessUp
+  url: https://github.com/LessUp
 
-# SEO & social
-author: LessUp
+twitter:
+  username: 
+
+github:
+  username: LessUp
+  repo: webrtc
+
 lang: zh-CN
+copyright: "© 2025-2026 LessUp. Released under MIT License."
+
+# Analytics (optional - uncomment to enable)
+# analytics:
+#   provider: google
+#   google:
+#     tracking_id: YOUR_GA_ID
+
+# Features
+show_downloads: true
+downloads:
+  source:
+    label: View Source
+    url: https://github.com/LessUp/webrtc
+  zip:
+    label: Download ZIP
+    url: https://github.com/LessUp/webrtc/archive/refs/heads/main.zip
+
+# Navigation
+nav:
+  - title: 首页
+    url: /
+  - title: 文档
+    url: /docs/
+  - title: 指南
+    url: /docs/guide
+  - title: API
+    url: /docs/api
+  - title: GitHub
+    url: https://github.com/LessUp/webrtc
+    external: true
 
 # Markdown rendering
 markdown: kramdown
@@ -23,22 +74,80 @@ kramdown:
   input: GFM
   hard_wrap: false
   syntax_highlighter: rouge
+  syntax_highlighter_opts:
+    css_class: 'highlight'
+    span:
+      line_numbers: false
+    block:
+      line_numbers: true
+      start_line: 1
 
-# Exclude build artifacts
+# Sass/SCSS
+sass:
+  sass_dir: assets/css
+  style: compressed
+
+# Build settings
+future: false
+incremental: false
+lsi: false
+
+# Exclusions
 exclude:
   - cmd/
   - internal/
   - web/
+  - e2e/
+  - deploy/
   - go.mod
   - go.sum
   - Dockerfile
+  - Dockerfile.*
+  - docker-compose*.yml
+  - .air.toml
   - .editorconfig
   - .gitattributes
   - .golangci.yml
-  - .vscode/
-  - .github/
+  - .env*
   - vendor/
   - bin/
   - _site/
   - .jekyll-cache/
+  - .jekyll-metadata
+  - "*.gemspec"
+  - "*.gem"
+  - Makefile
+  - LICENSE
+  - "*.log"
   - "*.exe"
+  - node_modules/
+  - package*.json
+  - vitest.config.js
+  - playwright.config.js
+
+# Include specific files
+include:
+  - _pages
+
+# Collections
+collections:
+  docs:
+    output: true
+    permalink: /:collection/:name/
+
+# Defaults
+defaults:
+  - scope:
+      path: ""
+      type: "posts"
+    values:
+      layout: default
+  - scope:
+      path: ""
+      type: "docs"
+    values:
+      layout: default
+  - scope:
+      path: "docs/**"
+    values:
+      layout: default

@@ -106,6 +106,7 @@ func (c *Client) setRoom(room string) {
 
 // checkRateLimit implements token bucket rate limiting.
 // Returns true if the message should be allowed, false if rate limited.
+// Allows burst up to RateLimitBurst (50), then enforces MaxMessagesPerSecond (30/sec).
 func (c *Client) checkRateLimit() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -120,20 +121,21 @@ func (c *Client) checkRateLimit() bool {
 
 	c.msgCount++
 
-	// Allow burst up to RateLimitBurst, then enforce MaxMessagesPerSecond
+	// First check: absolute burst limit (hard cap at 50)
 	if c.msgCount > RateLimitBurst {
 		if !c.rateLimited {
 			c.rateLimited = true
-			log.Printf("signal: rate limiting client conn=%d", c.connID)
+			log.Printf("signal: rate limiting client conn=%d (burst exceeded)", c.connID)
 		}
 		return false
 	}
 
-	// After burst, check per-second rate
+	// Second check: per-second rate limit after initial burst window
+	// Only enforce if we're past the burst allowance (30) within the first second
 	if c.msgCount > MaxMessagesPerSecond && now.Sub(c.msgWindow) < time.Second {
 		if !c.rateLimited {
 			c.rateLimited = true
-			log.Printf("signal: rate limiting client conn=%d", c.connID)
+			log.Printf("signal: rate limiting client conn=%d (rate exceeded)", c.connID)
 		}
 		return false
 	}
@@ -154,12 +156,19 @@ func (c *Client) enqueue(msg Message) error {
 	}
 
 	timer := time.NewTimer(SendTimeout)
-	defer timer.Stop()
 
 	select {
 	case <-c.closed:
+		timer.Stop()
 		return errClientClosed
 	case c.send <- msg:
+		// Drain timer to prevent resource leak
+		if !timer.Stop() {
+			select {
+			case <-timer.C:
+			default:
+			}
+		}
 		return nil
 	case <-timer.C:
 		return errors.New("send timeout")
@@ -509,11 +518,10 @@ func (h *Hub) broadcastMembers(room string) {
 		h.mu.RUnlock()
 		return
 	}
-	recipients := make([]*Client, 0, len(m))
+	// Capture connection IDs and member IDs while holding lock
 	members := make([]string, 0, len(m))
-	for id, cli := range m {
+	for id := range m {
 		members = append(members, id)
-		recipients = append(recipients, cli)
 	}
 	h.mu.RUnlock()
 
@@ -523,8 +531,30 @@ func (h *Hub) broadcastMembers(room string) {
 		Room:    room,
 		Members: members,
 	}
+
+	// Re-acquire lock to get current client snapshot
+	h.mu.RLock()
+	currentRoom, ok := h.rooms[room]
+	if !ok {
+		h.mu.RUnlock()
+		return
+	}
+	// Copy client pointers while holding lock
+	recipients := make([]*Client, 0, len(currentRoom))
+	for _, cli := range currentRoom {
+		recipients = append(recipients, cli)
+	}
+	h.mu.RUnlock()
+
 	for _, cli := range recipients {
 		if cli == nil {
+			continue
+		}
+		// Double-check client is still in room before sending
+		h.mu.RLock()
+		_, stillInRoom := h.rooms[room][cli.id]
+		h.mu.RUnlock()
+		if !stillInRoom {
 			continue
 		}
 		if err := cli.enqueue(msg); err != nil {

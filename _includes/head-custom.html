@@ -1,0 +1,90 @@
+<!-- WebRTC GitHub Pages - Custom Head Elements -->
+
+<!-- Favicon -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📹</text></svg>">
+
+<!-- Preconnect for performance -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+<!-- Open Graph / Facebook -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{ site.url }}{{ site.baseurl }}{{ page.url }}">
+<meta property="og:title" content="{% if page.title %}{{ page.title }} — {% endif %}{{ site.title }}">
+<meta property="og:description" content="{% if page.description %}{{ page.description }}{% else %}{{ site.description }}{% endif %}">
+<meta property="og:image" content="{{ site.url }}{{ site.baseurl }}/assets/og-image.png">
+<meta property="og:site_name" content="{{ site.title }}">
+<meta property="og:locale" content="zh_CN">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:url" content="{{ site.url }}{{ site.baseurl }}{{ page.url }}">
+<meta name="twitter:title" content="{% if page.title %}{{ page.title }} — {% endif %}{{ site.title }}">
+<meta name="twitter:description" content="{% if page.description %}{{ page.description }}{% else %}{{ site.description }}{% endif %}">
+<meta name="twitter:image" content="{{ site.url }}{{ site.baseurl }}/assets/og-image.png">
+{% if site.twitter.username %}<meta name="twitter:creator" content="@{{ site.twitter.username }}">{% endif %}
+
+<!-- Structured Data - JSON-LD -->
+{% if page.url == '/' %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "WebRTC Demo Project",
+  "description": "{{ site.description }}",
+  "url": "{{ site.url }}{{ site.baseurl }}",
+  "author": {
+    "@type": "Organization",
+    "name": "LessUp"
+  },
+  "codeRepository": "https://github.com/LessUp/webrtc",
+  "programmingLanguage": ["Go", "JavaScript", "HTML", "CSS"],
+  "softwareRequirements": "Go 1.22+, Chrome/Edge/Firefox,",
+  "license": "https://github.com/LessUp/webrtc/blob/main/LICENSE",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Cross-platform"
+}
+</script>
+{% else %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "{% if page.title %}{{ page.title }}{% else %}{{ site.title }}{% endif %}",
+  "description": "{% if page.description %}{{ page.description }}{% else %}{{ site.description }}{% endif %}",
+  "url": "{{ site.url }}{{ site.baseurl }}{{ page.url }}",
+  "author": {
+    "@type": "Organization",
+    "name": "LessUp"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "LessUp"
+  }
+}
+</script>
+{% endif %}
+
+<!-- Theme Color for Mobile Browsers -->
+<meta name="theme-color" content="#00ADD8">
+<meta name="msapplication-TileColor" content="#00ADD8">
+
+<!-- Mobile Optimization -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+<!-- Disable automatic phone number detection on iOS -->
+<meta name="format-detection" content="telephone=no">
+
+<!-- Performance: DNS Prefetch -->
+<link rel="dns-prefetch" href="https://github.com">
+
+<!-- Page-specific styles -->
+{% if page.url == '/' %}
+<style>
+  /* Homepage specific optimizations */
+  .page-header {
+    padding-top: 4rem;
+    padding-bottom: 4rem;
+  }
+</style>
+{% endif %}
