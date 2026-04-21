@@ -1,22 +1,26 @@
 ---
 layout: default
-title: 开发路线图 — WebRTC
-description: WebRTC 示例项目各阶段开发计划与进度追踪
+title: Roadmap — WebRTC
+description: WebRTC development roadmap and milestone tracking - features, phases, and future plans
 ---
 
-[← 返回首页]({{ site.baseurl }}/)
+[← Back to Home]({{ site.baseurl }}/) | [返回首页]({{ site.baseurl }}/)
 
-# WebRTC 开发路线图
+# Development Roadmap / 开发路线图
 
-> **项目定位**：基于 Go 的生产级 WebRTC 学习平台，从基础点对点通话到高级多人 Mesh 架构，覆盖 WebRTC 核心能力的完整实现。
+> **Project Positioning / 项目定位**: A production-ready WebRTC learning platform built with Go, covering everything from basic peer-to-peer calls to advanced multi-party Mesh architecture.
+>
+> 基于 Go 的生产级 WebRTC 学习平台，从基础点对点通话到高级多人 Mesh 架构，覆盖 WebRTC 核心能力的完整实现。
+
+This roadmap documents the development plan, milestones, and progress tracking, designed with a progressive learning path.
 
 本路线图记录项目的开发计划、里程碑和进度追踪，采用渐进式学习路径设计。
 
 ---
 
-## 📊 项目概览
+## 📊 Project Overview / 项目概览
 
-### 基本信息
+### Basic Info / 基本信息
 
 | 项目 | 内容 |
 |:-----|:-----|
@@ -294,5 +298,5 @@ description: WebRTC 示例项目各阶段开发计划与进度追踪
 
 ---
 
-**最后更新**：2024-01-15
+**最后更新**：2026-04-17
 **维护者**：LessUp Team

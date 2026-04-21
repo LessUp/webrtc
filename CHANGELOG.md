@@ -1,18 +1,21 @@
 ---
 layout: default
-title: 变更日志 — WebRTC
-description: WebRTC 项目版本历史和变更记录
+title: Changelog — WebRTC
+description: WebRTC version history and release notes - v1.0.0 production release with bilingual documentation
+lang: zh-CN
 ---
 
-[← 返回首页]({{ site.baseurl }}/)
+[← Back to Home]({{ site.baseurl }}/) | [返回首页]({{ site.baseurl }}/)
 
-# 变更日志
+# Changelog / 变更日志
+
+All notable changes are documented in the [`changelog/`](changelog/) directory. This page provides a quick overview of the version history.
 
 所有重要的变更都记录在 [`changelog/`](changelog/) 目录中。本文档提供版本历史的快速概览。
 
 ---
 
-## 版本时间线
+## Version Timeline / 版本时间线
 
 <div class="timeline">
   <div class="timeline-item">
