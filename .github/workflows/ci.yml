@@ -163,6 +163,8 @@ jobs:
   security:
     name: Security Scan
     runs-on: ubuntu-latest
+    # Skip for fork PRs due to authentication issues with trufflehog
+    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
     permissions:
       contents: read
       security-events: write
