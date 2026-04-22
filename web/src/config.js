@@ -23,7 +23,12 @@ export function createClientId() {
       return value.toString(16).padStart(2, '0');
     }).join('');
   }
-  return Math.random().toString(16).slice(2, 14);
+  // Fallback: ensure exactly 12 hex chars
+  var hex = Math.random().toString(16).slice(2);
+  while (hex.length < 12) {
+    hex += Math.random().toString(16).slice(2);
+  }
+  return hex.slice(0, 12);
 }
 
 export function getCapabilities() {
