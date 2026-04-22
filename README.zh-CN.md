@@ -36,6 +36,7 @@
 - [🚀 快速开始](#-快速开始)
 - [🏗️ 系统架构](#️-系统架构)
 - [📚 文档导航](#-文档导航)
+- [📊 系统要求](#-系统要求)
 - [⚙️ 配置说明](#️-配置说明)
 - [🚀 部署指南](#-部署指南)
 - [🤝 参与贡献](#-参与贡献)
@@ -61,7 +62,7 @@
 
 ### 生产就绪
 - **🔒 安全优先** — 来源验证、身份绑定、速率限制
-- **📦 零依赖前端** — 纯原生 JavaScript
+- **📦 无需构建** — 纯原生 JavaScript，无构建步骤
 - **🐳 Docker 支持** — 多阶段构建，镜像体积最小
 - **🧪 完整测试** — 单元测试 + Playwright E2E 测试
 - **📝 中英双语** — 完整双语文档支持
@@ -77,6 +78,7 @@
 ### 环境要求
 
 - [Go 1.22+](https://golang.org/dl/)
+- [Node.js 20+](https://nodejs.org/)（前端/E2E 测试需要）
 - 现代浏览器 (Chrome 90+, Firefox 88+, Safari 14+)
 - [Docker](https://www.docker.com/)（可选）
 
@@ -95,15 +97,17 @@ go run ./cmd/server
 ### 方式二：Docker
 
 ```bash
-docker build -t webrtc .
+# 在项目根目录构建
+docker build -f deploy/docker/Dockerfile -t webrtc .
 docker run --rm -p 8080:8080 webrtc
 ```
 
 ### 方式三：Docker Compose（生产环境）
 
 ```bash
+# 在项目根目录执行
 export DOMAIN=your-domain.com
-docker compose up -d
+cd deploy/docker && docker compose up -d
 ```
 
 访问 `https://your-domain.com`，Caddy 自动配置 HTTPS。
@@ -209,6 +213,18 @@ webrtc/
 
 ---
 
+## 📊 系统要求
+
+| 场景 | 推荐配置 |
+|:-----|:---------|
+| 开发测试 | 1核 2GB 内存 |
+| 单房间（< 10 人）| 1核 1GB 内存 |
+| 50 人 Mesh 房间 | 4核 8GB 内存，良好带宽 |
+
+> **注意：** Mesh 架构将每个参与者互相连接，CPU/带宽使用量随人数呈平方增长。大规模房间建议使用 SFU 架构。
+
+---
+
 ## 📚 文档导航
 
 ### 📖 指南文档
@@ -238,6 +254,10 @@ webrtc/
 | `ADDR` | `:8080` | HTTP 服务监听地址 |
 | `WS_ALLOWED_ORIGINS` | `*` | 允许的请求来源（逗号分隔，`*` 表示允许所有）|
 | `RTC_CONFIG_JSON` | 公共 STUN | 传递给浏览器的 ICE/TURN 配置（JSON）|
+
+> ⚠️ **生产环境安全警告**
+> - 生产环境切勿使用 `WS_ALLOWED_ORIGINS=*`，必须设置为你的具体域名
+> - TURN 凭证请通过环境变量注入，**切勿提交到 Git**
 
 ### ICE/TURN 配置示例
 
@@ -315,6 +335,9 @@ services:
 # 设置
 go mod tidy
 
+# 一键运行所有检查（构建、测试、代码检查、静态分析）
+make check
+
 # 运行测试
 go test -race ./...
 
@@ -322,7 +345,7 @@ go test -race ./...
 golangci-lint run
 
 # 热重载开发
-air
+make dev
 ```
 
 ---

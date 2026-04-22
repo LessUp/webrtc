@@ -36,6 +36,7 @@
 - [🚀 Quick Start](#-quick-start)
 - [🏗️ Architecture](#️-architecture)
 - [📚 Documentation](#-documentation)
+- [📊 System Requirements](#-system-requirements)
 - [⚙️ Configuration](#️-configuration)
 - [🚀 Deployment](#-deployment)
 - [🤝 Contributing](#-contributing)
@@ -61,7 +62,7 @@
 
 ### Production Ready
 - **🔒 Security-First** — Origin validation, identity binding, rate limiting
-- **📦 Zero-Dependency Frontend** — Pure vanilla JavaScript
+- **📦 No-Build Frontend** — Pure vanilla JavaScript, zero build step
 - **🐳 Docker Ready** — Multi-stage builds for minimal image size
 - **🧪 Well Tested** — Unit tests, e2e tests with Playwright
 - **📝 Bilingual Docs** — Complete EN/ZH documentation
@@ -77,6 +78,7 @@
 ### Prerequisites
 
 - [Go 1.22+](https://golang.org/dl/)
+- [Node.js 20+](https://nodejs.org/) (for frontend/e2e tests)
 - Modern browser (Chrome 90+, Firefox 88+, Safari 14+)
 - [Docker](https://www.docker.com/) (optional)
 
@@ -95,15 +97,17 @@ go run ./cmd/server
 ### Option 2: Docker
 
 ```bash
-docker build -t webrtc .
+# Build from project root
+docker build -f deploy/docker/Dockerfile -t webrtc .
 docker run --rm -p 8080:8080 webrtc
 ```
 
 ### Option 3: Docker Compose (Production)
 
 ```bash
+# From project root
 export DOMAIN=your-domain.com
-docker compose up -d
+cd deploy/docker && docker compose up -d
 ```
 
 Visit `https://your-domain.com` with automatic HTTPS via Caddy.
@@ -209,6 +213,18 @@ webrtc/
 
 ---
 
+## 📊 System Requirements
+
+| Scenario | Recommended |
+|:---------|:------------|
+| Development | 1 core, 2GB RAM |
+| Single Room (< 10 users) | 1 core, 1GB RAM |
+| 50-user Mesh Room | 4 cores, 8GB RAM, good bandwidth |
+
+> **Note:** Mesh architecture connects each peer to all others. CPU/bandwidth usage scales quadratically with participant count. For large rooms, consider SFU architecture.
+
+---
+
 ## 📚 Documentation
 
 ### 📖 Guides
@@ -238,6 +254,10 @@ Complete documentation with search, navigation, and bilingual support.
 | `ADDR` | `:8080` | HTTP listen address |
 | `WS_ALLOWED_ORIGINS` | `*` | Allowed origins (comma-separated, `*` for all) |
 | `RTC_CONFIG_JSON` | Public STUN | ICE/TURN config (JSON) passed to browser |
+
+> ⚠️ **Production Security Warning**
+> - Never use `WS_ALLOWED_ORIGINS=*` in production. Set it to your specific domain.
+> - Never commit TURN credentials to version control. Use environment variables only.
 
 ### ICE/TURN Configuration Example
 
@@ -315,6 +335,9 @@ We welcome contributions! This project follows **Spec-Driven Development (SDD)**
 # Setup
 go mod tidy
 
+# Run all checks (build, test, lint, vet)
+make check
+
 # Run tests
 go test -race ./...
 
@@ -322,7 +345,7 @@ go test -race ./...
 golangci-lint run
 
 # Start with hot reload
-air
+make dev
 ```
 
 ---
