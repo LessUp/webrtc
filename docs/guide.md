@@ -1,482 +1,74 @@
 ---
-layout: default
+layout: docs
 title: Technical Guide — WebRTC
-description: Architecture, frontend implementation, media controls, DataChannel, and recording
+description: Architecture and code map for the LessUp WebRTC project.
 ---
-
-[← Back to Home]({{ site.baseurl }}/) | [Documentation Index](README.md)
 
 # Technical Guide
 
-This document covers the architecture, signaling flow, and implementation details of the WebRTC demo project.
+This page describes the current code layout, runtime flow, and the boundaries between the Go signaling server and the browser client.
 
----
+## Code map
 
-## Table of Contents
+```text
+cmd/server/main.go          HTTP entrypoint and static file serving
+internal/signal/hub.go      signaling hub, rooms, limits, cleanup
+internal/signal/message.go  message envelope
+web/src/core/app.js         browser app assembly
+web/src/controllers/        media, peers, signaling, stats, UI
+web/src/config.js           client defaults and capability checks
+```
 
-- [Quick Start](#quick-start)
-- [Architecture Overview](#architecture-overview)
-- [Signaling Server](#signaling-server)
-- [Frontend State Machine](#frontend-state-machine)
-- [Media Handling](#media-handling)
-- [PeerConnection Management](#peerconnection-management)
-- [DataChannel Chat](#datachannel-chat)
-- [Local Recording](#local-recording)
-- [Connection Stats](#connection-stats)
+## Request flow
 
----
+1. the browser loads static assets from `/`
+2. `web/src/core/app.js` assembles the controllers
+3. the client opens `ws://host/ws` or `wss://host/ws`
+4. the Go hub relays `join`, `offer`, `answer`, `candidate`, and membership updates
+5. media and chat move peer-to-peer after negotiation
 
-## Quick Start
+## Server responsibilities
 
-### Prerequisites
+`cmd/server/main.go` serves four main concerns:
 
-- Go 1.22+
-- Chrome / Edge / Firefox (latest)
-- Docker (optional, for deployment)
+- static frontend files
+- `GET /config.js` for runtime RTC config injection
+- `GET /healthz` for health checks
+- `GET /ws` for signaling
 
-### Local Development
+The hub in `internal/signal/` owns:
+
+- room creation and cleanup
+- client identity binding
+- origin checks
+- message validation and routing
+- send timeouts and rate limits
+
+## Frontend responsibilities
+
+The frontend is intentionally split by responsibility:
+
+| Module | Responsibility |
+|:-------|:---------------|
+| `core/app.js` | wires everything together |
+| `controllers/media.js` | local media, screen share, recording |
+| `controllers/peers.js` | `RTCPeerConnection` lifecycle and chat |
+| `controllers/signaling.js` | WebSocket join/leave/reconnect flow |
+| `controllers/stats.js` | connection stats |
+| `controllers/ui.js` | DOM updates and control state |
+| `config.js` | client ID, capability checks, RTC defaults |
+
+## Development commands
 
 ```bash
-# Clone repository
-git clone https://github.com/LessUp/webrtc.git
-cd webrtc
-
-# Install dependencies
-go mod tidy
-
-# Run server
 go run ./cmd/server
-
-# Open browser
-open http://localhost:8080
+make check
+cd web && npm test
+cd e2e && npm test
 ```
 
-### Testing Flow
-
-1. Open two browser tabs at `http://localhost:8080`
-2. Enter the same **room name** in both tabs
-3. Click **Join** in both tabs
-4. Click the other user's ID from the member list
-5. Click **Call** to initiate the connection
-6. Grant camera/microphone permissions
-7. Enjoy your WebRTC call!
-
----
-
-## Architecture Overview
-
-### Module Structure
-
-```
-webrtc/
-├── cmd/server/          # HTTP + WebSocket entry point
-├── internal/signal/     # Signaling logic
-│   ├── hub.go           # Room management, message relay
-│   ├── hub_test.go      # Unit tests
-│   └── message.go       # Message types
-└── web/                 # Frontend (vanilla JS)
-    ├── index.html       # UI
-    ├── app.js           # Main entry
-    ├── app.config.js    # Configuration, capabilities
-    ├── app.media.js     # Media handling
-    ├── app.peers.js     # PeerConnection management
-    ├── app.signaling.js # WebSocket signaling
-    ├── app.stats.js     # Connection stats
-    ├── app.ui.js        # UI rendering
-    └── styles.css       # Responsive styles
-```
-
-### High-Level Interaction
-
-```
-┌──────────────────────────────────────────────────────┐
-│  Browser A                                           │
-│  ┌──────────┐    ┌──────────┐    ┌────────────────┐ │
-│  │  HTML UI  │──→│  app.js  │──→│  getUserMedia   │ │
-│  └──────────┘    └────┬─────┘    └──────┬─────────┘ │
-└───────────────────────┼─────────────────┼───────────┘
-                        │ WebSocket       │ WebRTC P2P
-                 ┌──────▼──────┐          │
-                 │  Go Server   │          │
-                 │ ┌──────────┐│          │
-                 │ │Signal Hub││          │
-                 │ └──────────┘│          │
-                 └──────┬──────┘          │
-                        │ WebSocket       │
-┌───────────────────────┼─────────────────┼───────────┐
-│  Browser B            │                 │           │
-│  ┌──────────┐    ┌────▼─────┐    ┌──────▼─────────┐│
-│  │  HTML UI  │──→│  app.js  │──→│  getUserMedia   ││
-│  └──────────┘    └──────────┘    └────────────────┘│
-└─────────────────────────────────────────────────────┘
-```
-
-### Data Flow
-
-| Flow | Path | Protocol | Description |
-|:-----|:-----|:---------|:------------|
-| **Signaling** | Browser ↔ Server | WebSocket | Offer/Answer/ICE relay |
-| **Media** | Browser ↔ Browser | WebRTC (SRTP) | Audio/video streams |
-| **DataChannel** | Browser ↔ Browser | WebRTC (SCTP) | Text chat messages |
-
----
-
-## Signaling Server
-
-### Message Structure
-
-```go
-type Message struct {
-    Type      string          `json:"type"`
-    Room      string          `json:"room"`
-    From      string          `json:"from"`
-    To        string          `json:"to,omitempty"`
-    SDP       json.RawMessage `json:"sdp,omitempty"`
-    Candidate json.RawMessage `json:"candidate,omitempty"`
-    Members   []string        `json:"members,omitempty"`
-}
-```
-
-### Message Types
-
-| Type | Direction | Description |
-|:-----|:----------|:------------|
-| `join` | Client → Server | Join room request |
-| `joined` | Server → Client | Join confirmation |
-| `leave` | Client → Server | Leave room request |
-| `offer` | Client ↔ Client | SDP offer |
-| `answer` | Client ↔ Client | SDP answer |
-| `candidate` | Client ↔ Client | ICE candidate |
-| `hangup` | Client ↔ Client | End call |
-| `room_members` | Server → Clients | Member list broadcast |
-| `error` | Server → Client | Protocol error |
-| `ping/pong` | Client ↔ Server | Heartbeat |
-
-### Hub Data Structure
-
-```go
-type Hub struct {
-    mu               sync.RWMutex
-    rooms            map[string]map[string]*Client  // room → id → Client
-    clients          map[*Client]struct{}
-    allowedOrigins   []string
-    allowAllOrigins  bool
-}
-
-type Client struct {
-    id        string
-    room      string
-    connID    uint64
-    conn      *websocket.Conn
-    send      chan Message
-    closed    chan struct{}
-}
-```
-
-### Signaling Flow (1-on-1)
-
-```
-Browser A              Signal Hub              Browser B
-    │                      │                       │
-    │──── join ────────────▶                       │
-    │◀─── joined ───────────                       │
-    │                      │                       │
-    │                      │◀──── join ────────────│
-    │                      │──── joined ──────────▶│
-    │◀─────────────────────│─── room_members ─────▶│
-    │                      │                       │
-    │──── offer (to: B) ───▶──── offer ───────────▶│
-    │◀─── answer ───────────◀──── answer (to: A) ──│
-    │◀─── candidate ────────◀──── candidate ───────│
-    │──── candidate ────────▶──── candidate ──────▶│
-    │                      │                       │
-    │◀═════════════════════╪═════ WebRTC P2P ═════▶│
-```
-
-For detailed protocol specifications, see [Signaling Protocol](signaling.md).
-
----
-
-## Frontend State Machine
-
-### States
-
-| State | Description |
-|:------|:------------|
-| `idle` | Not connected to any room |
-| `connecting` | WebSocket connecting |
-| `joined` | In room, ready to call |
-| `reconnecting` | WebSocket reconnecting |
-| `calling` | Active peer connection(s) |
-
-### State Transitions
-
-```
-idle ──[connect]──▶ connecting ──[join success]──▶ joined
-  ▲                                                     │
-  │                                          [call start]
-  │                                                     ▼
-  └──[disconnect]── reconnecting ◀──[disconnect]── calling
-```
-
-### Core State Variables
-
-```javascript
-const state = {
-  myId: string,           // Local client ID
-  ws: WebSocket,          // WebSocket connection
-  roomId: string,         // Current room
-  roomState: 'idle',      // Connection state
-  localStream: MediaStream,
-  screenStream: MediaStream,
-  usingScreen: boolean,
-  muted: boolean,
-  cameraOff: boolean,
-  peers: Map<string, Peer>  // peerId → Peer
-};
-```
-
----
-
-## Media Handling
-
-### Getting Local Media
-
-```javascript
-async function ensureLocalMedia() {
-  if (state.localStream) return state.localStream;
-
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: true,
-    video: true
-  });
-
-  state.localStream = stream;
-  localVideo.srcObject = stream;
-  return stream;
-}
-```
-
-### Mute / Camera Toggle
-
-```javascript
-// Mute/unmute audio
-function toggleMute() {
-  state.muted = !state.muted;
-  state.localStream.getAudioTracks().forEach(track => {
-    track.enabled = !state.muted;
-  });
-}
-
-// Camera on/off
-function toggleCamera() {
-  state.cameraOff = !state.cameraOff;
-  state.localStream.getVideoTracks().forEach(track => {
-    track.enabled = !state.cameraOff;
-  });
-}
-```
-
-### Screen Sharing
-
-```javascript
-async function startScreenShare() {
-  const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-  state.screenStream = stream;
-  state.usingScreen = true;
-
-  // Replace video track in all peer connections
-  const videoTrack = stream.getVideoTracks()[0];
-  for (const peer of state.peers.values()) {
-    const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
-    if (sender) await sender.replaceTrack(videoTrack);
-  }
-
-  videoTrack.onended = () => stopScreenShare();
-}
-```
-
----
-
-## PeerConnection Management
-
-### Creating a Peer
-
-```javascript
-function ensurePeer(peerId) {
-  if (state.peers.has(peerId)) return state.peers.get(peerId);
-
-  const pc = new RTCPeerConnection(rtcConfig);
-  const peer = {
-    id: peerId,
-    pc: pc,
-    polite: state.myId.localeCompare(peerId) > 0,
-    makingOffer: false,
-    ignoreOffer: false,
-    pendingCandidates: []
-  };
-
-  pc.onicecandidate = e => {
-    if (e.candidate) {
-      sendSignal({ type: 'candidate', to: peerId, candidate: e.candidate });
-    }
-  };
-
-  pc.ontrack = e => {
-    const video = ensureRemoteTile(peerId);
-    video.srcObject = e.streams[0];
-  };
-
-  state.peers.set(peerId, peer);
-  return peer;
-}
-```
-
-### Perfect Negotiation
-
-The project implements the "Perfect Negotiation" pattern to handle glare (simultaneous offers):
-
-```javascript
-async function applyDescription(peerId, description) {
-  const peer = ensurePeer(peerId);
-  const pc = peer.pc;
-
-  // Collision detection
-  const offerCollision = description.type === 'offer' &&
-    (peer.makingOffer || pc.signalingState !== 'stable');
-
-  peer.ignoreOffer = !peer.polite && offerCollision;
-  if (peer.ignoreOffer) return;
-
-  await pc.setRemoteDescription(description);
-
-  if (description.type === 'offer') {
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    sendSignal({ type: 'answer', to: peerId, sdp: pc.localDescription });
-  }
-
-  // Drain pending candidates
-  while (peer.pendingCandidates.length) {
-    await pc.addIceCandidate(peer.pendingCandidates.shift());
-  }
-}
-```
-
-**Polite Peer Rule**: The peer with the lexicographically larger ID is "polite" and will defer when collisions occur.
-
----
-
-## DataChannel Chat
-
-### Setup
-
-```javascript
-function setupDataChannel(peer, channel) {
-  peer.dc = channel;
-
-  channel.onopen = () => {
-    appendChat(`[system] chat channel opened: ${peer.id}`);
-  };
-
-  channel.onmessage = e => {
-    appendChat(`${peer.id}: ${e.data}`);
-  };
-
-  channel.onclose = () => {
-    appendChat(`[system] chat channel closed: ${peer.id}`);
-  };
-}
-```
-
-### Sending Messages
-
-```javascript
-function sendChat() {
-  const text = chatInput.value.trim();
-  if (!text) return;
-
-  const channels = [];
-  for (const peer of state.peers.values()) {
-    if (peer.dc?.readyState === 'open') {
-      channels.push(peer.dc);
-    }
-  }
-
-  if (!channels.length) {
-    setError('No chat channel available');
-    return;
-  }
-
-  channels.forEach(dc => dc.send(text));
-  appendChat(`me: ${text}`);
-  chatInput.value = '';
-}
-```
-
----
-
-## Local Recording
-
-### Start Recording
-
-```javascript
-function startRecording() {
-  const stream = getRecordStream(); // remote > screen > local
-  if (!stream) return;
-
-  state.recordedChunks = [];
-  state.recorder = new MediaRecorder(stream);
-
-  state.recorder.ondataavailable = e => {
-    if (e.data?.size > 0) state.recordedChunks.push(e.data);
-  };
-
-  state.recorder.onstop = () => {
-    const blob = new Blob(state.recordedChunks, { type: 'video/webm' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `webrtc-recording-${Date.now()}.webm`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  state.recorder.start();
-}
-```
-
----
-
-## Connection Stats
-
-The stats controller polls `RTCPeerConnection.getStats()` every 2 seconds:
-
-| Metric | Description |
-|:-------|:------------|
-| Video bitrate | Outbound video bitrate (kbps) |
-| Resolution | Outbound video resolution |
-| Audio loss | Inbound audio packet loss (%) |
-| RTT | Round-trip time (ms) |
-| Codec | Video codec name (VP8/VP9/H.264) |
-
----
-
-## Reading Guide
-
-Recommended reading order:
-
-1. **This document** — Overview and architecture
-2. **[Signaling Protocol](signaling.md)** — Deep dive into signaling protocol
-3. **[API Reference](api.md)** — Configuration and limits
-4. **Source code** — Follow along with the documentation:
-   - `internal/signal/hub.go` — Backend signaling
-   - `web/app.*.js` — Frontend modules
-
----
-
-## Related Documentation
-
-- [Deployment Guide](deployment.md) — Production deployment
-- [Troubleshooting](troubleshooting.md) — Common issues
-- [Contributing](../CONTRIBUTING.md) — Development workflow
+## Where to look next
+
+- [Signaling Protocol](signaling)
+- [API Reference](api)
+- [OpenSpec Hub](specs)

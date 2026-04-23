@@ -1,24 +1,99 @@
-<!-- Global Navigation Header -->
-<nav class="site-nav">
+<!-- Navigation Header -->
+<nav class="site-nav" role="navigation" aria-label="Main navigation">
   <div class="nav-container">
-    <a href="{{ site.baseurl }}/" class="nav-brand">
-      WebRTC
+    <!-- Brand -->
+    <a href="{{ site.baseurl }}/" class="nav-brand" aria-label="{{ site.title }} - Home">
+      <span class="nav-logo">📹</span>
+      <span class="nav-brand-text">{{ site.title }}</span>
     </a>
-    
-    <ul class="nav-links">
-      {% for item in site.nav %}
-        <li>
-          <a href="{% if item.external %}{{ item.url }}{% else %}{{ site.baseurl }}{{ item.url }}{% endif %}" 
-             {% if item.external %}target="_blank" rel="noopener noreferrer" class="external"{% endif %}>
-            {{ item.title }}
+
+    <!-- Mobile Menu Toggle -->
+    <button type="button" class="nav-toggle" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="nav-menu">
+      <span class="nav-toggle-bar"></span>
+      <span class="nav-toggle-bar"></span>
+      <span class="nav-toggle-bar"></span>
+    </button>
+
+    <!-- Navigation Menu -->
+    <div class="nav-menu" id="nav-menu">
+      <ul class="nav-links">
+        {% for item in site.nav %}
+        {% assign is_active = false %}
+        {% if item.external %}
+          {% assign is_active = false %}
+        {% elsif item.url == '/' %}
+          {% if page.url == '/' or page.url == '/index.zh-CN' %}
+            {% assign is_active = true %}
+          {% endif %}
+        {% elsif page.url == item.url or page.url contains item.url %}
+          {% assign is_active = true %}
+        {% endif %}
+        <li class="nav-item{% if is_active %} active{% endif %}">
+          <a href="{% if item.external %}{{ item.url }}{% else %}{{ item.url | relative_url }}{% endif %}"
+             {% if item.external %}target="_blank" rel="noopener noreferrer"{% endif %}
+             class="nav-link">
+            {% if item.icon %}<span class="nav-link-icon">{{ item.icon }}</span>{% endif %}
+            <span class="nav-link-text">{{ item.title }}</span>
+            {% if item.external %}
+            <svg class="nav-external-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M7 17L17 7M17 7H7M17 7V17"/>
+            </svg>
+            {% endif %}
           </a>
         </li>
-      {% endfor %}
-    </ul>
-    
-    <div class="nav-lang">
-      <a href="{{ site.baseurl }}{{ page.url | remove: '.zh-CN' }}" {% unless page.url contains '.zh-CN' %}class="active"{% endunless %}>EN</a>
-      <a href="{{ site.baseurl }}{{ page.url | remove: '.zh-CN' }}.zh-CN" {% if page.url contains '.zh-CN' %}class="active"{% endif %}>中文</a>
+        {% endfor %}
+      </ul>
+
+      <!-- Language Switcher -->
+      {% assign show_lang_switch = false %}
+      {% assign en_url = '/' %}
+      {% assign zh_url = '/index.zh-CN' %}
+      {% if page.url == '/' or page.url == '/index.zh-CN' %}
+        {% assign show_lang_switch = true %}
+      {% elsif page.url == '/docs/' or page.url == '/docs/index.zh-CN' %}
+        {% assign show_lang_switch = true %}
+        {% assign en_url = '/docs/' %}
+        {% assign zh_url = '/docs/index.zh-CN' %}
+      {% elsif page.url contains '/docs/' %}
+        {% assign show_lang_switch = true %}
+        {% if page.url contains '.zh-CN' %}
+          {% assign en_url = page.url | remove: '.zh-CN' %}
+          {% assign zh_url = page.url %}
+        {% else %}
+          {% assign en_url = page.url %}
+          {% assign zh_url = page.url | append: '.zh-CN' %}
+        {% endif %}
+      {% endif %}
+      {% if show_lang_switch %}
+      <div class="nav-lang">
+        <a href="{{ en_url | relative_url }}"
+           class="lang-link{% unless page.url contains '.zh-CN' %} active{% endunless %}"
+           aria-label="English
+
+ version"
+            title="English">
+          EN
+        </a>
+        <span class="lang-divider">|</span>
+        <a href="{{ zh_url | relative_url }}"
+           class="lang-link{% if page.url contains '.zh-CN' %} active{% endif %}"
+           aria-label="Chinese version"
+           title="简体中文">
+          中
+        </a>
+      </div>
+      {% endif %}
+
+      <!-- Theme Toggle -->
+      <button type="button" class="theme-toggle" aria-label="Toggle dark mode" title="Toggle theme">
+        <svg class="theme-icon-light" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="5"/>
+          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>
+        <svg class="theme-icon-dark" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </button>
     </div>
   </div>
 </nav>

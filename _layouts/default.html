@@ -1,45 +1,218 @@
 <!DOCTYPE html>
-<html lang="{{ page.lang | default: site.lang | default: 'zh-CN' }}">
+<html lang="{{ page.lang | default: site.lang | default: 'en' }}" data-theme="auto">
   <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
 
-{% seo %}
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#157878">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="stylesheet" href="{{ '/assets/css/style.css?v=' | append: site.github.build_revision | relative_url }}">
+    <!-- Preconnect -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://github.com">
+
+    {% seo %}
+
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#00ADD8" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)">
+    <meta name="msapplication-TileColor" content="#00ADD8">
+    <meta name="msapplication-TileImage" content="{{ site.baseurl }}/assets/images/mstile-144x144.png">
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%2300ADD8'/><text y='.9em' font-size='70' x='50' text-anchor='middle' dominant-baseline='middle'>📹</text></svg>">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ site.baseurl }}/assets/images/apple-touch-icon.png">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="{{ '/assets/css/style.css' | relative_url }}">
+    
     {% include head-custom.html %}
+
+    <!-- Page-specific meta -->
+    {% if page.description %}
+    <meta name="description" content="{{ page.description }}">
+    <meta property="og:description" content="{{ page.description }}">
+    <meta name="twitter:description" content="{{ page.description }}">
+    {% endif %}
+    {% if page.image %}
+    <meta property="og:image" content="{{ page.image | absolute_url }}">
+    <meta name="twitter:image" content="{{ page.image | absolute_url }}">
+    {% else %}
+    <meta property="og:image" content="{{ '/assets/images/og-image.png' | absolute_url }}">
+    <meta name="twitter:image" content="{{ '/assets/images/og-image.png' | absolute_url }}">
+    {% endif %}
+    <meta property="og:type" content="{% if page.layout == 'post' %}article{% else %}website{% endif %}">
+    <meta property="og:url" content="{{ page.url | absolute_url }}">
+    <meta name="twitter:card" content="summary_large_image">
   </head>
   <body>
-    <a id="skip-to-content" href="#content" class="visually-hidden">Skip to content</a>
-    
+    <!-- Skip Link for Accessibility -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
+    <!-- Navigation -->
     {% include nav-header.html %}
 
-    <header class="page-header" role="banner">
-      <h1 class="project-name">{{ page.title | default: site.title | default: site.github.repository_name }}</h1>
-      <h2 class="project-tagline">{{ page.description | default: site.description | default: site.github.project_tagline }}</h2>
-      {% if site.github.is_project_page %}
-        <a href="{{ site.github.repository_url }}" class="btn">View on GitHub</a>
-      {% endif %}
-      {% if site.show_downloads %}
-        {% if site.downloads.source %}
-          <a href="{{ site.downloads.source.url }}" class="btn">{{ site.downloads.source.label }}</a>
-        {% endif %}
-        {% if site.downloads.zip %}
-          <a href="{{ site.downloads.zip.url }}" class="btn">{{ site.downloads.zip.label }}</a>
-        {% endif %}
-      {% endif %}
+    <!-- Hero Section (only on homepage) -->
+    {% if page.url == '/' or page.url == '/index.zh-CN' %}
+    <header class="site-hero" role="banner">
+      <div class="hero-background">
+        <div class="hero-particles"></div>
+        <div class="hero-gradient"></div>
+      </div>
+      <div class="hero-content">
+        <div class="hero-badge">
+          <span class="badge badge-success">Production Ready</span>
+          <span class="badge badge-info">v{{ site.version | default: '1.0.0' }}</span>
+        </div>
+        <h1 class="hero-title">
+          <span class="gradient-text">{{ site.title }}</span>
+        </h1>
+        <p class="hero-subtitle">
+          {{ site.description | newline_to_br | strip_newlines }}
+        </p>
+        <div class="hero-stats">
+          <div class="stat">
+            <span class="stat-value">Go</span>
+            <span class="stat-label">Backend</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat">
+            <span class="stat-value">JS</span>
+            <span class="stat-label">Frontend</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat">
+            <span class="stat-value">50</span>
+            <span class="stat-label">Max/room</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat">
+            <span class="stat-value">MIT</span>
+            <span class="stat-label">License</span>
+          </div>
+        </div>
+        <div class="hero-actions">
+          <a href="#quick-start" class="btn btn-primary btn-lg">
+            <span class="btn-icon">🚀</span>
+            Quick Start
+          </a>
+          {% assign docs_home_url = site.nav[1].url %}
+          {% if page.url == '/index.zh-CN' %}
+            {% assign docs_home_url = '/docs/index.zh-CN' %}
+          {% endif %}
+          <a href="{{ docs_home_url | relative_url }}" class="btn btn-secondary btn-lg">
+            <span class="btn-icon">📖</span>
+            Documentation
+          </a>
+          <a href="{{ site.downloads.source.url }}" class="btn btn-ghost btn-lg" target="_blank" rel="noopener">
+            <span class="btn-icon">⭐</span>
+            Star on GitHub
+          </a>
+        </div>
+        <div class="hero-badges">
+          <img src="https://github.com/LessUp/webrtc/actions/workflows/ci.yml/badge.svg" alt="CI" loading="lazy">
+          <img src="https://github.com/LessUp/webrtc/actions/workflows/pages.yml/badge.svg" alt="Pages" loading="lazy">
+          <img src="https://img.shields.io/github/v/release/LessUp/webrtc?include_prereleases&color=00ADD8" alt="Release" loading="lazy">
+          <img src="https://img.shields.io/badge/License-MIT-00C853.svg" alt="License" loading="lazy">
+        </div>
+      </div>
+      <div class="hero-scroll">
+        <span class="scroll-indicator">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 5v14M19 12l-7 7-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+      </div>
     </header>
+    {% endif %}
 
-    <main id="content" class="main-content" role="main">
-      {{ content }}
-
-      <footer class="site-footer">
-        {% if site.github.is_project_page %}
-          <span class="site-footer-owner"><a href="{{ site.github.repository_url }}">{{ site.github.repository_name }}</a> is maintained by <a href="{{ site.github.owner_url }}">{{ site.github.owner_name }}</a>.</span>
+    <!-- Page Header (non-homepage) -->
+    {% if page.url != '/' and page.url != '/index.zh-CN' and page.title %}
+    <header class="page-header-small" role="banner">
+      <div class="container">
+        <nav aria-label="Breadcrumb" class="breadcrumb">
+          <ol>
+            <li><a href="{{ site.baseurl }}/">Home</a></li>
+            {% if page.collection %}
+              {% assign collection_label = page.collection | capitalize %}
+              <li><a href="{{ site.baseurl }}/{{ page.collection }}/">{{ collection_label }}</a></li>
+            {% endif %}
+            <li aria-current="page">{{ page.title }}</li>
+          </ol>
+        </nav>
+        <h1 class="page-title">{{ page.title }}</h1>
+        {% if page.description %}
+        <p class="page-description">{{ page.description }}</p>
         {% endif %}
-        <span class="site-footer-credits">{{ site.copyright | default: '© 2025-2026 LessUp' }}</span>
-      </footer>
+      </div>
+    </header>
+    {% endif %}
+
+    <!-- Main Content -->
+    <main id="main-content" class="main-content" role="main">
+      <div class="container">
+        {{ content }}
+      </div>
     </main>
+
+    <!-- Footer -->
+    <footer class="site-footer" role="contentinfo">
+      <div class="footer-container">
+        <div class="footer-brand">
+          <span class="footer-logo">📹 {{ site.title }}</span>
+          <p class="footer-tagline">{{ site.subtitle }}</p>
+          <div class="footer-social">
+            <a href="https://github.com/LessUp/webrtc" target="_blank" rel="noopener" aria-label="GitHub">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+              </svg>
+            </a>
+          </div>
+        </div>
+        <div class="footer-links">
+          <div class="footer-section">
+            <h4>Documentation</h4>
+            <ul>
+              <li><a href="{{ site.baseurl }}/docs/guide">Technical Guide</a></li>
+              <li><a href="{{ site.baseurl }}/docs/signaling">Signaling Protocol</a></li>
+              <li><a href="{{ site.baseurl }}/docs/deployment">Deployment</a></li>
+              <li><a href="{{ site.baseurl }}/docs/api">API Reference</a></li>
+            </ul>
+          </div>
+          <div class="footer-section">
+            <h4>Resources</h4>
+            <ul>
+              <li><a href="{{ site.baseurl }}/docs/specs">Specs</a></li>
+              <li><a href="{{ site.baseurl }}/ROADMAP">Roadmap</a></li>
+              <li><a href="{{ site.baseurl }}/CHANGELOG">Changelog</a></li>
+              <li><a href="https://github.com/LessUp/webrtc/issues">Issues</a></li>
+            </ul>
+          </div>
+          <div class="footer-section">
+            <h4>Community</h4>
+            <ul>
+              <li><a href="https://github.com/LessUp/webrtc">GitHub</a></li>
+              <li><a href="{{ site.baseurl }}/CONTRIBUTING">Contributing</a></li>
+              <li><a href="https://github.com/LessUp/webrtc/blob/main/.github/SECURITY.md">Security</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <div class="container">
+          <p>{{ site.copyright }} • Released under <a href="https://github.com/LessUp/webrtc/blob/main/LICENSE">{{ site.license }}</a> License</p>
+          <p class="footer-made-with">Made with ❤️ by <a href="https://github.com/LessUp">LessUp</a></p>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Back to Top Button -->
+    <button type="button" class="back-to-top" aria-label="Back to top" hidden>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+
+    <!-- Scripts -->
+    <script src="{{ '/assets/js/main.js' | relative_url }}" defer></script>
   </body>
 </html>

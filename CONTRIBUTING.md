@@ -1,230 +1,76 @@
 ---
 layout: default
 title: Contributing — WebRTC
-description: WebRTC project contribution guidelines, code standards, and spec-driven workflow
+description: Contribution workflow for LessUp WebRTC using OpenSpec, focused reviews, and low-noise closeout practices.
 ---
 
 [← Back to Home]({{ site.baseurl }}/)
 
 # Contributing
 
-Thank you for your interest in contributing! This project follows **Spec-Driven Development (SDD)**. The `/specs` directory is the Single Source of Truth.
+This repository uses **OpenSpec** for planning and change control. Contributions should keep the project coherent, low-noise, and easy to maintain.
 
----
+## Before you start
 
-## Table of Contents
+1. Read the relevant spec in `openspec/specs/`.
+2. If behavior or scope needs to change, create or update an OpenSpec change in `openspec/changes/`.
+3. Keep the change focused. This repo prefers a single clean result over many parallel branches or speculative experiments.
 
-- [Spec-Driven Development Workflow](#spec-driven-development-workflow)
-- [How to Participate in Spec Writing](#how-to-participate-in-spec-writing)
-- [Development Workflow](#development-workflow)
-- [Development Environment](#development-environment)
-- [Testing & Quality](#testing--quality)
-- [Code Standards](#code-standards)
-- [Commit Convention](#commit-convention)
+## Recommended flow
 
----
+1. **Plan the work**
+   - Use `/plan` or write out the implementation approach locally for multi-file work.
+   - If a change already exists, read `proposal.md`, `design.md`, and `tasks.md`.
 
-## Spec-Driven Development Workflow
+2. **Implement against the active change**
+   - Follow the task order in `openspec/changes/<name>/tasks.md`.
+   - Update docs/config with the code so the repo stays coherent.
 
-This project uses the `/specs` directory as the Single Source of Truth:
+3. **Validate**
+   - `make check`
+   - `cd web && npm test`
+   - `cd e2e && npm test` when UI or signaling behavior changes
+   - `openspec validate --all --strict`
 
-| Directory | Purpose |
-|:----------|:--------|
-| `/specs/product/` | Product feature definitions and acceptance criteria |
-| `/specs/rfc/` | Technical design documents and architecture decisions |
-| `/specs/api/` | API interface definitions (OpenAPI signaling spec) |
-| `/specs/db/` | Storage schema specifications |
-| `/specs/testing/` | BDD test specifications |
+4. **Review**
+   - Run `/review` before merge or before shipping a large cleanup batch.
+   - Note any intentional deletions, consolidations, or trade-offs in the PR description.
 
-### Before Writing Code
+## Branching and merge style
 
-1. **Read the relevant spec** in `/specs/` (product specs, RFCs, API definitions)
-2. **If the feature doesn't exist in specs**, propose a spec update first
-3. **Wait for spec approval** before implementing
+- Prefer short-lived branches.
+- Merge quickly once the OpenSpec tasks and review are complete.
+- Avoid accumulating many local/cloud branches waiting to be reconciled.
+- Avoid `/fleet` by default; longer focused sessions fit this project better.
 
-### The Four-Step Workflow
+## Optional local hook setup
 
-| Step | Action | Description |
-|:-----|:-------|:------------|
-| **1. Review Specs** | Read `/specs/` | Understand existing definitions before coding |
-| **2. Spec-First Update** | Update spec first | For new features or interface changes, update spec before code |
-| **3. Implementation** | Write code | Code must 100% comply with spec definitions |
-| **4. Test Against Spec** | Write tests | Cover all acceptance criteria from spec |
-
-**See [AGENTS.md](../AGENTS.md) for the complete AI/human workflow.**
-
----
-
-## How to Participate in Spec Writing
-
-### Proposing a New Feature
-
-1. **Create a Product Spec** in `/specs/product/` with:
-   - Feature description
-   - User stories
-   - Acceptance criteria
-   - State diagrams (if applicable)
-
-2. **Create an RFC** in `/specs/rfc/` with:
-   - Technical approach
-   - Architecture decisions
-   - Trade-offs considered
-   - Security implications
-
-3. **Update API Spec** in `/specs/api/` if the feature adds/modifies:
-   - WebSocket message types
-   - HTTP endpoints
-   - Data structures
-
-### Proposing a Bug Fix
-
-1. **Reference the relevant spec** that defines expected behavior
-2. **Identify the gap** between spec and implementation
-3. **Decide**: Should the spec change, or should the code?
-
-### Spec Review Process
-
-1. Open a Pull Request with spec changes
-2. Maintainers review for:
-   - Completeness
-   - Consistency with existing specs
-   - Technical feasibility
-3. Once approved, implementation can begin
-
----
-
-## Development Workflow
-
-### 1. Fork & Branch
+The repo includes a lightweight pre-commit hook:
 
 ```bash
-# Fork the repository on GitHub
-git clone https://github.com/YOUR_USERNAME/webrtc.git
-cd webrtc
-git checkout -b feature/your-feature
+git config core.hooksPath .githooks
 ```
 
-### 2. Follow SDD
+The hook:
 
-1. Read relevant specs in `/specs/`
-2. Update specs if needed (spec-first!)
-3. Implement code following spec definitions
-4. Write tests based on acceptance criteria
+- formats staged Go files with `gofmt`
+- blocks staged docs/config files that still reference legacy `/specs/` or `.meta/`
 
-### 3. Commit & Push
+## Tooling expectations
 
-```bash
-git add .
-git commit -m "feat: add your feature"
-git push origin feature/your-feature
-```
-
-### 4. Create Pull Request
-
-- Reference any spec changes in your PR description
-- Ensure all CI checks pass
-- Link to relevant issues
-
----
-
-## Development Environment
-
-### Prerequisites
-
-| Requirement | Version |
-|:------------|:--------|
+| Area | Current expectation |
+|:-----|:--------------------|
 | Go | 1.22+ |
-| Browser | Chrome 90+ / Firefox 88+ / Safari 14+ |
-| golangci-lint | Latest (optional, for local lint) |
+| Frontend | Vanilla JavaScript ES modules |
+| Lint | `golangci-lint` v2 config |
+| Specs | `openspec/` only |
+| Pages | Jekyll from repository root |
 
-### Start Development Server
+## Pull requests
 
-```bash
-go mod tidy
-go run ./cmd/server
-# Visit http://localhost:8080
-```
+- Reference the active OpenSpec change when relevant.
+- Keep PR scope narrow.
+- If you delete or consolidate docs, explain why.
+- Make sure public docs do not expose private maintenance or archive intentions.
 
----
-
-## Testing & Quality
-
-Before submitting, ensure all checks pass:
-
-```bash
-# Build
-go build ./...
-
-# Unit tests (with race detector on Linux/macOS)
-go test -race -count=1 ./...
-
-# Static analysis
-go vet ./...
-
-# Lint (requires golangci-lint)
-golangci-lint run
-```
-
-CI automatically runs:
-- golangci-lint (11 linters)
-- Multi-version Go tests
-- staticcheck
-
----
-
-## Code Standards
-
-### Go Code
-
-- Follow `gofmt` formatting
-- Pass `go vet` checks
-- Comply with `.golangci.yml` lint rules
-- Use tabs for indentation
-- US English spelling
-
-### Frontend Code
-
-- 2-space indentation (see `.editorconfig`)
-- Vanilla JavaScript only (no frameworks)
-- ES6+ features allowed
-- `'use strict'` at module level
-
-### General
-
-- Keep implementations simple
-- No gold-plating (only implement what's in the spec)
-- Document public APIs
-
----
-
-## Commit Convention
-
-Use [Conventional Commits](https://www.conventionalcommits.org/):
-
-| Prefix | Usage |
-|:-------|:------|
-| `feat:` | New feature |
-| `fix:` | Bug fix |
-| `docs:` | Documentation update |
-| `refactor:` | Code refactoring |
-| `test:` | Adding/updating tests |
-| `chore:` | Build/tooling changes |
-
-### Examples
-
-```
-feat: add screen sharing support
-fix: resolve ICE candidate ordering issue
-docs: update deployment guide for TURN
-refactor: simplify Hub message routing
-test: add edge cases for room limits
-chore: update golangci-lint config
-```
-
----
-
-## Need Help?
-
-- **Questions?** [Open a Discussion](https://github.com/LessUp/webrtc/discussions)
-- **Found a bug?** [Open an Issue](https://github.com/LessUp/webrtc/issues)
-- **Want to understand the architecture?** Read the [RFCs](../specs/rfc/)
+Thanks for helping keep the project clean and stable.
