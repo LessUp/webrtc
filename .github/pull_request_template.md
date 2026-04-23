@@ -1,27 +1,31 @@
-## Description
-<!-- Please include a summary of the change and which issue is fixed -->
+## Summary
 
-Fixes # (issue)
+<!-- Explain the user-visible or maintainer-visible result. -->
 
-## Type of Change
-<!-- Please delete options that are not relevant -->
-- [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
-- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [ ] Documentation update
+## OpenSpec Change
 
-## How Has This Been Tested?
-<!-- Please describe the tests that you ran -->
-- [ ] Unit tests pass
-- [ ] Integration tests pass
-- [ ] E2E tests pass
-- [ ] Manual testing done
+<!-- Link the active change, or write "not needed" if no requirement changed. -->
+
+## Scope
+
+- [ ] Runtime code
+- [ ] Docs / Pages
+- [ ] CI / automation
+- [ ] Repository metadata
+
+## Validation
+
+- [ ] `make check`
+- [ ] `cd web && npm test`
+- [ ] `cd e2e && npm test`
+- [ ] `openspec validate --all --strict`
+
+## Review Notes
+
+<!-- Mention any trade-offs, follow-ups, or why a file was deleted/consolidated. -->
 
 ## Checklist
-- [ ] My code follows the project's style guidelines
-- [ ] I have performed a self-review of my own code
-- [ ] I have commented my code, particularly in hard-to-understand areas
-- [ ] I have made corresponding changes to the documentation
-- [ ] My changes generate no new warnings
-- [ ] I have added tests that prove my fix is effective or that my feature works
-- [ ] New and existing unit tests pass locally with my changes
+
+- [ ] The change follows the active OpenSpec proposal/design/tasks, or no change artifact was needed
+- [ ] Public docs and navigation do not contain stale `/specs/` or `.meta/` references
+- [ ] I ran `/review` or performed an equivalent final review before merge

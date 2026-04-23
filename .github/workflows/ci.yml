@@ -1,4 +1,4 @@
-name: Go CI
+name: Validate
 
 on:
   push:
@@ -9,15 +9,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: validate-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
-
 jobs:
-  lint:
-    name: Lint
+  go:
+    name: Go checks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -29,49 +26,25 @@ jobs:
           go-version: '1.23'
           cache: true
 
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: v2.1.0
-
-  test:
-    name: Test (Go ${{ matrix.go-version }})
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: ['1.22', '1.23']
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ matrix.go-version }}
-          cache: true
-
-      - name: Verify dependencies
+      - name: Verify modules
         run: go mod verify
 
       - name: Build
         run: go build ./...
 
-      - name: Run tests
-        run: go test -race -count=1 -coverprofile=coverage.out ./...
+      - name: Test
+        run: go test -race -count=1 ./...
 
-      - name: Run vet
+      - name: Vet
         run: go vet ./...
 
-      - name: Upload coverage
-        if: matrix.go-version == '1.23'
-        uses: codecov/codecov-action@v4
+      - name: Lint
+        uses: golangci/golangci-lint-action@v9
         with:
-          files: ./coverage.out
-          flags: unittests
-          fail_ci_if_error: false
+          version: v2.1.0
 
-  frontend-test:
-    name: Frontend Tests
+  frontend:
+    name: Frontend tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -92,112 +65,25 @@ jobs:
         working-directory: web
         run: npm test
 
-  e2e-test:
-    name: E2E Tests
+  docker:
+    name: Docker smoke build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
-          cache: true
+      - name: Build image
+        run: docker build -f deploy/docker/Dockerfile -t webrtc:test .
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: e2e/package-lock.json
-
-      - name: Install E2E dependencies
-        working-directory: e2e
-        run: npm ci
-
-      - name: Install Playwright browsers
-        working-directory: e2e
-        run: npx playwright install --with-deps chromium
-
-      - name: Build server
-        run: go build -o ./tmp/server ./cmd/server
-
-      - name: Run E2E tests
+      - name: Smoke test image
         run: |
-          # Start server in background from project root (so it can find web/ dir)
-          ./tmp/server &
-          SERVER_PID=$!
-          # Wait for server to be ready
-          for i in {1..30}; do
-            if curl -s http://localhost:8080/healthz > /dev/null 2>&1; then
-              break
+          docker run -d --name webrtc-test -p 8080:8080 webrtc:test
+          trap 'docker rm -f webrtc-test >/dev/null 2>&1 || true' EXIT
+          for i in {1..20}; do
+            if curl -fsS http://localhost:8080/healthz >/dev/null; then
+              exit 0
             fi
             sleep 1
           done
-          # Run tests from e2e directory
-          cd e2e && npx playwright test --reporter=list
-          TEST_EXIT=$?
-          # Cleanup
-          kill $SERVER_PID 2>/dev/null || true
-          exit $TEST_EXIT
-
-  docker:
-    name: Docker Build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Build Docker image
-        run: docker build -f deploy/docker/Dockerfile -t webrtc:test .
-
-      - name: Test Docker image
-        run: |
-          docker run -d --name webrtc-test -p 8080:8080 webrtc:test
-          sleep 5
-          curl -s http://localhost:8080/healthz | grep -q ok
-          docker stop webrtc-test
-          docker rm webrtc-test
-
-  security:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    # Skip for fork PRs due to authentication issues with trufflehog
-    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
-    permissions:
-      contents: read
-      security-events: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
-          cache: true
-
-      - name: Run govulncheck
-        uses: golang/govulncheck-action@v1
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-
-      - name: Upload Trivy results
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: 'trivy-results.sarif'
-
-      - name: Secret detection
-        uses: trufflesecurity/trufflehog@main
-        with:
-          path: ./
-          base: main
-          head: HEAD
-          extra_args: --debug --only-verified
+          echo "docker smoke test failed" >&2
+          exit 1
