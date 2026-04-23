@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path // .tool_response.filePath // empty'); [ -z \"$f\" ] && exit 0; case \"$f\" in *.go) gofmt -w \"$f\" ;; *.md|*.html|*.yml|*.yaml|*.json) if rg -n '\\.meta/|/specs/|specs/(product|rfc|api|db|testing|README)' \"$f\" >/dev/null; then echo \"Legacy /specs/ or .meta/ reference found in $f\" >&2; exit 1; fi ;; esac",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
+}
