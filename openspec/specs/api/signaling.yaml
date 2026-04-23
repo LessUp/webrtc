@@ -1,0 +1,117 @@
+openapi: 3.0.3
+info:
+  title: WebRTC Signaling API
+  description: WebSocket-based signaling API for WebRTC peer connection establishment
+  version: 1.0.0
+  license:
+    name: MIT
+    url: https://github.com/LessUp/webrtc/blob/main/LICENSE
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+paths:
+  /:
+    get:
+      summary: Main application
+      description: Serves index.html with WebRTC client UI
+      responses:
+        '200':
+          description: HTML page
+
+  /healthz:
+    get:
+      summary: Health check
+      description: Returns "ok" if server is running
+      responses:
+        '200':
+          description: ok
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: ok
+
+  /ws:
+    get:
+      summary: WebSocket upgrade
+      description: Upgrade HTTP connection to WebSocket for signaling
+      responses:
+        '101':
+          description: Switching Protocols
+
+components:
+  schemas:
+    Message:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - join
+            - joined
+            - leave
+            - offer
+            - answer
+            - candidate
+            - hangup
+            - room_members
+            - ping
+            - pong
+            - error
+        room:
+          type: string
+          maxLength: 64
+        from:
+          type: string
+          maxLength: 64
+        to:
+          type: string
+          maxLength: 64
+        sdp:
+          type: object
+        candidate:
+          type: object
+        members:
+          type: array
+          items:
+            type: string
+        code:
+          type: string
+        error:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        type:
+          type: string
+          example: error
+        code:
+          type: string
+          enum:
+            - invalid_id
+            - invalid_room
+            - identity_locked
+            - already_joined
+            - duplicate_id
+            - room_full
+            - room_limit_reached
+            - not_joined
+            - invalid_target
+            - target_not_found
+        error:
+          type: string
+
+x-limits:
+  maxRooms: 1000
+  maxClientsPerRoom: 50
+  maxRoomIdLength: 64
+  maxClientIdLength: 64
+  sendBufferSize: 64
+  sendTimeoutSeconds: 2
+  maxMessageSizeBytes: 1048576
+

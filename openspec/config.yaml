@@ -1,0 +1,34 @@
+# OpenSpec Configuration
+# https://github.com/Fission-AI/OpenSpec
+
+schema: spec-driven
+
+context: |
+  Tech stack: Go 1.22+, Vanilla JavaScript (ES6+)
+  WebSocket: gorilla/websocket v1.5.3
+  Architecture: Mesh (up to 50 participants per room)
+  Development Model: Spec-Driven Development (SDD)
+
+  Frontend:
+  - No build tools (pure ES6 modules)
+  - No framework (vanilla JavaScript)
+  - Files served directly by Go HTTP server
+
+  Backend:
+  - Go standard library + gorilla/websocket
+  - In-memory state (no persistence)
+  - Rate limiting and origin validation
+
+rules:
+  specs:
+    - Use SHALL/MUST for mandatory requirements
+    - Include scenarios for each requirement (WHEN/THEN format)
+    - Reference existing patterns before inventing new ones
+    - Be explicit about mechanisms, not just outcomes
+  design:
+    - Document any platform-specific behavior
+    - Prefer Go standard library patterns
+  tasks:
+    - Run `make check` before marking task complete
+    - Update OpenAPI spec when changing message types
+    - Add tests for new functionality
