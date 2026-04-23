@@ -2,14 +2,21 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [master, main]
+    branches: [main, master]
     paths:
-      - '*.md'
-      - 'docs/**'
-      - 'changelog/**'
-      - '_config.yml'
       - '404.md'
-      - '.github/workflows/pages.yml'
+      - 'CHANGELOG.md'
+      - 'CONTRIBUTING.md'
+      - 'ROADMAP.md'
+      - 'index.md'
+      - 'index.zh-CN.md'
+      - 'assets/**'
+      - '_config.yml'
+      - '_layouts/**'
+      - '_includes/**'
+      - 'docs/**'
+      - 'openspec/specs/**'
+      - 'changelog/**'
   workflow_dispatch:
 
 permissions:
@@ -21,9 +28,6 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -31,23 +35,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          sparse-checkout-cone-mode: false
-          sparse-checkout: |
-            *.md
-            _config.yml
-            404.md
-            docs
-            changelog
-            LICENSE
+          fetch-depth: 0
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - name: Build with Jekyll
         uses: actions/jekyll-build-pages@v1
         with:
           source: ./
           destination: ./_site
+          future: false
+          unpublished: false
+
+      - name: Verify build
+        run: |
+          test -f ./_site/index.html
+          test -f ./_site/docs/index.html
+          test -f ./_site/assets/css/style.css
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
