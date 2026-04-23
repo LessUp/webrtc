@@ -1,4 +1,9 @@
+# Claude Code
+CLAUDE.local.md
+.claude/worktrees/
+
 # Build outputs
+/tmp/
 /bin/
 /build/
 /dist/
@@ -23,7 +28,9 @@ web/node_modules/
 *.log
 *.pid
 *.tmp
-*.cache
+
+# E2E test artifacts
+e2e/test-results/
 
 # Editors & IDEs
 .vscode/
