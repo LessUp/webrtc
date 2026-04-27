@@ -34,35 +34,6 @@ LessUp WebRTC 更像是一份可读的参考实现，而不是堆满框架和基
   </div>
 </div>
 
-<a id="quick-start"></a>
-## 快速开始
-
-```bash
-git clone https://github.com/LessUp/webrtc.git
-cd webrtc
-go run ./cmd/server
-```
-
-然后在两个浏览器窗口打开 `http://localhost:8080`，加入同一个房间即可开始测试。
-
-### 校验命令
-
-```bash
-make check
-cd web && npm test
-```
-
-## 运行时结构
-
-```text
-cmd/server/main.go          HTTP 服务、/ws、/healthz、/config.js
-internal/signal/            Hub、消息处理、限制与测试
-web/src/core/app.js         浏览器入口
-web/src/controllers/        media / peers / signaling / stats / UI
-openspec/specs/             仓库唯一事实来源
-docs/                       公共文档与规范导航
-```
-
 ## 继续浏览
 
 <div class="doc-cards">

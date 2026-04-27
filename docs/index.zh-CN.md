@@ -7,12 +7,6 @@ lang: zh-CN
 
 # 文档首页
 
-<div class="github-cta" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 24px; margin-bottom: 32px; color: white; text-align: center;">
-  <h3 style="margin: 0 0 8px 0; color: white;">⭐ 喜欢这个项目？</h3>
-  <p style="margin: 0 0 16px 0; opacity: 0.9;">在 GitHub 上给我们一个 Star 表示支持！</p>
-  <a href="https://github.com/LessUp/webrtc" class="github-button" style="display: inline-block; background: white; color: #333; padding: 10px 24px; border-radius: 6px; text-decoration: none; font-weight: 600;">访问 GitHub</a>
-</div>
-
 ## 为什么选择 LessUp WebRTC？
 
 | 特性 | 描述 |
@@ -61,17 +55,6 @@ lang: zh-CN
     <span class="doc-arrow">→</span>
   </a>
 </div>
-
-## 按目标阅读
-
-| 目标 | 对应页面 |
-|:-----|:---------|
-| 看懂代码结构 | [技术指南](guide.zh-CN) |
-| 对接信令接口 | [API 参考](api.zh-CN) |
-| 理解 WebSocket 消息流 | [信令协议](signaling.zh-CN) |
-| 运行或部署项目 | [部署指南](deployment.zh-CN) |
-| 排查常见问题 | [故障排查](troubleshooting.zh-CN) |
-| 查看唯一事实来源规范 | [OpenSpec 导航](specs.zh-CN) |
 
 ## 公开规范模型
 

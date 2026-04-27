@@ -33,35 +33,6 @@ LessUp WebRTC is built for developers who want a practical reference implementat
   </div>
 </div>
 
-<a id="quick-start"></a>
-## Quick Start
-
-```bash
-git clone https://github.com/LessUp/webrtc.git
-cd webrtc
-go run ./cmd/server
-```
-
-Then open `http://localhost:8080` in two browser windows and join the same room.
-
-### Validation
-
-```bash
-make check
-cd web && npm test
-```
-
-## Runtime shape
-
-```text
-cmd/server/main.go          HTTP server, /ws, /healthz, /config.js
-internal/signal/            Hub, message handling, limits, tests
-web/src/core/app.js         browser app entrypoint
-web/src/controllers/        media, peers, signaling, stats, UI
-openspec/specs/             repository source of truth
-docs/                       public documentation and spec hub
-```
-
 ## Explore the project
 
 <div class="doc-cards">
