@@ -383,7 +383,9 @@ func isLocalhostHost(hostPort string) bool {
 func (h *Hub) handleMessage(client *Client, msg Message) error {
 	// Rate limit check
 	if !client.checkRateLimit() {
-		_ = client.sendError("rate_limited", "too many messages, please slow down")
+		if err := client.sendError("rate_limited", "too many messages, please slow down"); err != nil {
+			log.Printf("signal: failed to send rate_limited error to conn=%d: %v", client.connID, err)
+		}
 		return errors.New("rate limited")
 	}
 
@@ -398,7 +400,9 @@ func (h *Hub) handleMessage(client *Client, msg Message) error {
 	case "offer", "answer", "candidate", "hangup":
 		return h.forward(client, msg)
 	default:
-		_ = client.sendError("unknown_type", "unsupported message type")
+		if err := client.sendError("unknown_type", "unsupported message type"); err != nil {
+			log.Printf("signal: failed to send unknown_type error to conn=%d: %v", client.connID, err)
+		}
 		return errors.New("unknown message type")
 	}
 }
@@ -406,29 +410,39 @@ func (h *Hub) handleMessage(client *Client, msg Message) error {
 func (h *Hub) handleJoin(c *Client, msg Message) error {
 	id := normalizeClientID(msg.From, MaxClientIDLength)
 	if id == "" {
-		_ = c.sendError("invalid_id", "invalid client id")
+		if err := c.sendError("invalid_id", "invalid client id"); err != nil {
+			log.Printf("signal: failed to send invalid_id error to conn=%d: %v", c.connID, err)
+		}
 		return errors.New("invalid client id")
 	}
 	room := normalizeRoomName(msg.Room, MaxRoomIDLength)
 	if room == "" {
-		_ = c.sendError("invalid_room", "invalid room name")
+		if err := c.sendError("invalid_room", "invalid room name"); err != nil {
+			log.Printf("signal: failed to send invalid_room error to conn=%d: %v", c.connID, err)
+		}
 		return errors.New("invalid room")
 	}
 
 	boundID, currentRoom := c.identity()
 	if boundID != "" && boundID != id {
-		_ = c.sendError("identity_locked", "connection identity is immutable")
+		if err := c.sendError("identity_locked", "connection identity is immutable"); err != nil {
+			log.Printf("signal: failed to send identity_locked error to conn=%d: %v", c.connID, err)
+		}
 		return errors.New("identity mismatch")
 	}
 	if currentRoom != "" && currentRoom != room {
-		_ = c.sendError("already_joined", "leave the current room before joining another")
+		if err := c.sendError("already_joined", "leave the current room before joining another"); err != nil {
+			log.Printf("signal: failed to send already_joined error to conn=%d: %v", c.connID, err)
+		}
 		return errors.New("already joined")
 	}
 
 	c.setIdentity(id, room)
 	if err := h.addClient(c); err != nil {
 		c.setIdentity("", "") // Clear both id and room on failure
-		_ = c.sendError(err.Code, err.Error())
+		if sendErr := c.sendError(err.Code, err.Error()); sendErr != nil {
+			log.Printf("signal: failed to send %s error to conn=%d: %v", err.Code, c.connID, sendErr)
+		}
 		return err
 	}
 	if err := c.enqueue(Message{Type: "joined", Room: room, From: id}); err != nil {
@@ -513,17 +527,20 @@ func (h *Hub) removeClient(c *Client) {
 
 func (h *Hub) broadcastMembers(room string) {
 	h.mu.RLock()
+	defer h.mu.RUnlock()
+
 	m, ok := h.rooms[room]
 	if !ok {
-		h.mu.RUnlock()
 		return
 	}
-	// Capture connection IDs and member IDs while holding lock
+
+	// Single critical section snapshot: capture both member IDs and client pointers
 	members := make([]string, 0, len(m))
-	for id := range m {
+	recipients := make([]*Client, 0, len(m))
+	for id, cli := range m {
 		members = append(members, id)
+		recipients = append(recipients, cli)
 	}
-	h.mu.RUnlock()
 
 	sort.Strings(members)
 	msg := Message{
@@ -532,35 +549,16 @@ func (h *Hub) broadcastMembers(room string) {
 		Members: members,
 	}
 
-	// Re-acquire lock to get current client snapshot
-	h.mu.RLock()
-	currentRoom, ok := h.rooms[room]
-	if !ok {
-		h.mu.RUnlock()
-		return
-	}
-	// Copy client pointers while holding lock
-	recipients := make([]*Client, 0, len(currentRoom))
-	for _, cli := range currentRoom {
-		recipients = append(recipients, cli)
-	}
-	h.mu.RUnlock()
-
+	// Send to all recipients while still holding lock (enqueue is non-blocking)
 	for _, cli := range recipients {
 		if cli == nil {
 			continue
 		}
-		// Double-check client is still in room before sending
-		h.mu.RLock()
-		_, stillInRoom := h.rooms[room][cli.id]
-		h.mu.RUnlock()
-		if !stillInRoom {
-			continue
-		}
 		if err := cli.enqueue(msg); err != nil {
 			log.Printf("signal: members broadcast failed room=%s conn=%d: %v", room, cli.connID, err)
-			h.removeClient(cli)
-			cli.close()
+			// Remove client asynchronously to avoid deadlock
+			go h.removeClient(cli)
+			go cli.close()
 		}
 	}
 }
@@ -568,12 +566,16 @@ func (h *Hub) broadcastMembers(room string) {
 func (h *Hub) forward(sender *Client, msg Message) error {
 	id, room := sender.identity()
 	if id == "" || room == "" {
-		_ = sender.sendError("not_joined", "join a room first")
+		if err := sender.sendError("not_joined", "join a room first"); err != nil {
+			log.Printf("signal: failed to send not_joined error to conn=%d: %v", sender.connID, err)
+		}
 		return errors.New("sender not joined")
 	}
 	to := normalizeClientID(msg.To, MaxClientIDLength)
 	if to == "" || to == id {
-		_ = sender.sendError("invalid_target", "invalid target client")
+		if err := sender.sendError("invalid_target", "invalid target client"); err != nil {
+			log.Printf("signal: failed to send invalid_target error to conn=%d: %v", sender.connID, err)
+		}
 		return errors.New("invalid target")
 	}
 
@@ -581,19 +583,25 @@ func (h *Hub) forward(sender *Client, msg Message) error {
 	m, ok := h.rooms[room]
 	if !ok {
 		h.mu.RUnlock()
-		_ = sender.sendError("room_missing", "room no longer exists")
+		if err := sender.sendError("room_missing", "room no longer exists"); err != nil {
+			log.Printf("signal: failed to send room_missing error to conn=%d: %v", sender.connID, err)
+		}
 		return errors.New("room missing")
 	}
 	current, ok := m[id]
 	if !ok || current != sender {
 		h.mu.RUnlock()
-		_ = sender.sendError("membership_lost", "client is no longer registered in room")
+		if err := sender.sendError("membership_lost", "client is no longer registered in room"); err != nil {
+			log.Printf("signal: failed to send membership_lost error to conn=%d: %v", sender.connID, err)
+		}
 		return errors.New("sender not registered")
 	}
 	dst, ok := m[to]
 	h.mu.RUnlock()
 	if !ok || dst == nil {
-		_ = sender.sendError("target_not_found", "target client is not in the room")
+		if err := sender.sendError("target_not_found", "target client is not in the room"); err != nil {
+			log.Printf("signal: failed to send target_not_found error to conn=%d: %v", sender.connID, err)
+		}
 		return errors.New("target not found")
 	}
 

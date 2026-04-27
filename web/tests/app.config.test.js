@@ -49,13 +49,11 @@ describe('app.config', function () {
       expect(ids.size).toBeGreaterThan(40);
     });
 
-    it('falls back to Math.random when crypto is unavailable', function () {
+    it('throws error when crypto is unavailable', function () {
       var origCrypto = window.crypto;
       delete window.crypto;
       try {
-        var id = createClientId();
-        expect(id).toHaveLength(12);
-        expect(id).toMatch(/^[0-9a-f]{12}$/);
+        expect(function () { createClientId(); }).toThrow('Secure random number generation not available');
       } finally {
         window.crypto = origCrypto;
       }

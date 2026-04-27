@@ -23,12 +23,8 @@ export function createClientId() {
       return value.toString(16).padStart(2, '0');
     }).join('');
   }
-  // Fallback: ensure exactly 12 hex chars
-  var hex = Math.random().toString(16).slice(2);
-  while (hex.length < 12) {
-    hex += Math.random().toString(16).slice(2);
-  }
-  return hex.slice(0, 12);
+  // No secure random available - reject rather than use unsafe fallback
+  throw new Error('Secure random number generation not available. Please use a modern browser with crypto support.');
 }
 
 export function getCapabilities() {

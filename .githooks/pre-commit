@@ -22,11 +22,11 @@ fi
 
 text_files="$(printf '%s\n' "${staged_files}" | rg '\.(md|html|yml|yaml|json)$' || true)"
 if [[ -n "${text_files}" ]]; then
-  if rg -n '\.meta/|/specs/|specs/(product|rfc|api|db|testing|README)' ${text_files} >/tmp/webrtc-hook-legacy-refs.txt 2>/dev/null; then
+  tmpfile=$(mktemp)
+  trap 'rm -f "$tmpfile"' EXIT
+  if rg -n '\.meta/|/specs/|specs/(product|rfc|api|db|testing|README)' ${text_files} >"$tmpfile" 2>/dev/null; then
     echo "pre-commit: legacy /specs/ or .meta/ reference detected in staged files" >&2
-    cat /tmp/webrtc-hook-legacy-refs.txt >&2
-    rm -f /tmp/webrtc-hook-legacy-refs.txt
+    cat "$tmpfile" >&2
     exit 1
   fi
-  rm -f /tmp/webrtc-hook-legacy-refs.txt
 fi
