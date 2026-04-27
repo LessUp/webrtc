@@ -6,6 +6,22 @@ description: Documentation hub for LessUp WebRTC: architecture, signaling, deplo
 
 # Documentation
 
+<div class="github-cta" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 24px; margin-bottom: 32px; color: white; text-align: center;">
+  <h3 style="margin: 0 0 8px 0; color: white;">⭐ Like this project?</h3>
+  <p style="margin: 0 0 16px 0; opacity: 0.9;">Star us on GitHub to show your support!</p>
+  <a href="https://github.com/LessUp/webrtc" class="github-button" style="display: inline-block; background: white; color: #333; padding: 10px 24px; border-radius: 6px; text-decoration: none; font-weight: 600;">View on GitHub</a>
+</div>
+
+## Why LessUp WebRTC?
+
+| Feature | Description |
+|:--------|:------------|
+| 🪶 **Lightweight** | Single Go dependency (gorilla/websocket), no heavy frameworks |
+| ⚡ **Zero Build** | Vanilla JavaScript ES6+, served directly—no bundlers, no transpilers |
+| 📋 **OpenSpec-Driven** | Spec-first development with structured change management |
+| 🌐 **Bilingual Docs** | Complete documentation in English and Chinese |
+| 🔧 **Production-Ready** | Docker, Kubernetes, and Fly.io deployment configs included |
+
 Use this page as the public entrypoint for understanding the project.
 
 ## Start here

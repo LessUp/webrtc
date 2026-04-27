@@ -102,3 +102,12 @@ A change is only complete when:
 - automation and local instructions match the actual toolchain
 - GitHub metadata matches the site and the implementation
 - the OpenSpec change is ready to apply or archive without ambiguity
+
+## Known Limitations
+
+These are intentional design choices, not bugs:
+
+- **No authentication:** This is a demo; production deployments would need auth
+- **Public STUN only:** Uses Google's public STUN server; TURN requires manual configuration
+- **Chinese UI:** Primary audience is Chinese developers
+- **No video recording backend:** Recording is browser-side only (MediaRecorder API)
