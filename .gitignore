@@ -1,6 +1,7 @@
 # Claude Code
 CLAUDE.local.md
 .claude/worktrees/
+.omc/
 
 # Build outputs
 /tmp/
