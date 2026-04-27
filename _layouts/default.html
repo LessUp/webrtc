@@ -91,9 +91,9 @@
           </div>
         </div>
         <div class="hero-actions">
-          <a href="#quick-start" class="btn btn-primary btn-lg">
-            <span class="btn-icon">🚀</span>
-            Quick Start
+          <a href="{{ site.downloads.source.url }}" class="btn btn-primary btn-lg" target="_blank" rel="noopener">
+            <span class="btn-icon">📦</span>
+            View on GitHub
           </a>
           {% assign docs_home_url = site.nav[1].url %}
           {% if page.url == '/index.zh-CN' %}
@@ -103,10 +103,6 @@
             <span class="btn-icon">📖</span>
             Documentation
           </a>
-          <a href="{{ site.downloads.source.url }}" class="btn btn-ghost btn-lg" target="_blank" rel="noopener">
-            <span class="btn-icon">⭐</span>
-            Star on GitHub
-          </a>
         </div>
         <div class="hero-badges">
           <img src="https://github.com/LessUp/webrtc/actions/workflows/ci.yml/badge.svg" alt="CI" loading="lazy">
@@ -114,13 +110,6 @@
           <img src="https://img.shields.io/github/v/release/LessUp/webrtc?include_prereleases&color=00ADD8" alt="Release" loading="lazy">
           <img src="https://img.shields.io/badge/License-MIT-00C853.svg" alt="License" loading="lazy">
         </div>
-      </div>
-      <div class="hero-scroll">
-        <span class="scroll-indicator">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 5v14M19 12l-7 7-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </span>
       </div>
     </header>
     {% endif %}
