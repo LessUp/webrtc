@@ -47,7 +47,12 @@ export function createSignalingController(options) {
     state.ws = ws;
 
     ws.onopen = function () {
-      ws.send(JSON.stringify({ type: 'join', room: state.roomId, from: state.myId }));
+      try {
+        ws.send(JSON.stringify({ type: 'join', room: state.roomId, from: state.myId }));
+      } catch (err) {
+        console.error('signal: failed to send join:', err);
+        ui.setError('加入房间失败');
+      }
     };
 
     ws.onmessage = function (event) {
@@ -86,12 +91,16 @@ export function createSignalingController(options) {
         case 'offer':
         case 'answer':
           if (msg.from && msg.sdp) {
-            void peerController.applyDescription(msg.from, msg.sdp);
+            void peerController.applyDescription(msg.from, msg.sdp).catch(function (err) {
+              console.warn('peer: failed to apply description:', err);
+            });
           }
           break;
         case 'candidate':
           if (msg.from && msg.candidate) {
-            void peerController.handleCandidate(msg.from, msg.candidate);
+            void peerController.handleCandidate(msg.from, msg.candidate).catch(function (err) {
+              console.warn('peer: failed to handle candidate:', err);
+            });
           }
           break;
         case 'hangup':
@@ -165,7 +174,11 @@ export function createSignalingController(options) {
     }
     if (state.ws) {
       state.manualClose = true;
-      state.ws.send(JSON.stringify({ type: 'leave', room: state.roomId, from: state.myId }));
+      try {
+        state.ws.send(JSON.stringify({ type: 'leave', room: state.roomId, from: state.myId }));
+      } catch (err) {
+        console.error('signal: failed to send leave:', err);
+      }
       try { state.ws.close(); } catch (err) { console.warn('ws.close error:', err); }
     }
     state.ws = null;

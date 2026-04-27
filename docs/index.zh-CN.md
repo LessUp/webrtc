@@ -7,6 +7,22 @@ lang: zh-CN
 
 # 文档首页
 
+<div class="github-cta" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 24px; margin-bottom: 32px; color: white; text-align: center;">
+  <h3 style="margin: 0 0 8px 0; color: white;">⭐ 喜欢这个项目？</h3>
+  <p style="margin: 0 0 16px 0; opacity: 0.9;">在 GitHub 上给我们一个 Star 表示支持！</p>
+  <a href="https://github.com/LessUp/webrtc" class="github-button" style="display: inline-block; background: white; color: #333; padding: 10px 24px; border-radius: 6px; text-decoration: none; font-weight: 600;">访问 GitHub</a>
+</div>
+
+## 为什么选择 LessUp WebRTC？
+
+| 特性 | 描述 |
+|:-----|:-----|
+| 🪶 **轻量级** | 仅一个 Go 依赖 (gorilla/websocket)，无重型框架 |
+| ⚡ **零构建** | 原生 JavaScript ES6+，直接服务——无打包器、无转译器 |
+| 📋 **OpenSpec 驱动** | 规范优先开发，结构化变更管理 |
+| 🌐 **双语文档** | 完整的中英文文档 |
+| 🔧 **生产就绪** | 包含 Docker、Kubernetes、Fly.io 部署配置 |
+
 把这里当成公开文档的总入口即可。
 
 ## 从这里开始
