@@ -58,4 +58,4 @@ type Message struct {
 - 信令控制器：`web/src/controllers/signaling.js`
 - 默认配置与能力检测：`web/src/config.js`
 
-行为细节见 [信令协议](/webrtc/zh/signaling)，代码布局见 [技术指南](/webrtc/zh/guide)。
+行为细节见 [信令协议](/zh/signaling)，代码布局见 [技术指南](/zh/guide)。

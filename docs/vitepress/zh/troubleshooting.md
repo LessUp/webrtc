@@ -38,4 +38,4 @@ description: 运行 LessUp WebRTC 时常见问题与修复建议。
 ## 仍然卡住？
 
 - [提交 Issue](https://github.com/LessUp/webrtc/issues)
-- 对照 [OpenSpec 导航](/webrtc/zh/specs)
+- 对照 [OpenSpec 导航](/zh/specs)

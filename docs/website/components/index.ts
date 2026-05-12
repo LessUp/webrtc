@@ -1,5 +1,0 @@
-export { Hero } from './Hero'
-export { FeatureCard } from './FeatureCard'
-export { CodeShowcase } from './CodeShowcase'
-export { LanguageSelector } from './LanguageSelector'
-export { LanguageToggle } from './LanguageToggle'

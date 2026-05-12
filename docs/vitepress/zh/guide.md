@@ -68,6 +68,6 @@ cd e2e && npm test
 
 ## 下一步阅读
 
-- [信令协议](/webrtc/zh/signaling)
-- [API 参考](/webrtc/zh/api)
-- [OpenSpec 导航](/webrtc/zh/specs)
+- [信令协议](/zh/signaling)
+- [API 参考](/zh/api)
+- [OpenSpec 导航](/zh/specs)

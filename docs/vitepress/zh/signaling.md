@@ -55,5 +55,5 @@ Go Hub 会强制执行：
 ## 协议的落点
 
 - 运行时代码：`internal/signal/`
-- 规范要求：见 [OpenSpec 导航](/webrtc/zh/specs)
+- 规范要求：见 [OpenSpec 导航](/zh/specs)
 - 消息结构：`internal/signal/message.go`

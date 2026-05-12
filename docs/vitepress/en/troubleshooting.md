@@ -38,4 +38,4 @@ description: Common problems and fixes when running LessUp WebRTC.
 ## Still stuck?
 
 - [Open an issue](https://github.com/LessUp/webrtc/issues)
-- compare behavior against the [OpenSpec Hub](/webrtc/en/specs)
+- compare behavior against the [OpenSpec Hub](/en/specs)

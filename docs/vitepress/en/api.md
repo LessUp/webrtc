@@ -58,4 +58,4 @@ type Message struct {
 - signaling client: `web/src/controllers/signaling.js`
 - defaults and capability checks: `web/src/config.js`
 
-See [Signaling Protocol](/webrtc/en/signaling) for behavior and [Technical Guide](/webrtc/en/guide) for code layout.
+See [Signaling Protocol](/en/signaling) for behavior and [Technical Guide](/en/guide) for code layout.

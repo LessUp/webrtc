@@ -55,5 +55,5 @@ Server   -> room_members (A, B)
 ## Where the protocol lives
 
 - runtime implementation: `internal/signal/`
-- normative requirement specs: [OpenSpec Hub](/webrtc/en/specs)
+- normative requirement specs: [OpenSpec Hub](/en/specs)
 - message envelope: `internal/signal/message.go`

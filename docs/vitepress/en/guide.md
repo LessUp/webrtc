@@ -68,6 +68,6 @@ cd e2e && npm test
 
 ## Where to look next
 
-- [Signaling Protocol](/webrtc/en/signaling)
-- [API Reference](/webrtc/en/api)
-- [OpenSpec Hub](/webrtc/en/specs)
+- [Signaling Protocol](/en/signaling)
+- [API Reference](/en/api)
+- [OpenSpec Hub](/en/specs)
