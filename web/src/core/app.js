@@ -6,6 +6,8 @@ import {
   getCapabilities,
   getRtcConfig
 } from '../config.js';
+import { createAppState, RoomStatus } from '../state/index.js';
+import { createChatController } from '../controllers/chat.js';
 import { createMediaController } from '../controllers/media.js';
 import { createPeerController } from '../controllers/peers.js';
 import { createSignalingController } from '../controllers/signaling.js';
@@ -17,59 +19,49 @@ const capabilities = getCapabilities();
 const appConfig = window.__APP_CONFIG__ || {};
 const rtcConfig = getRtcConfig(appConfig, DEFAULT_RTC_CONFIG);
 
-const state = {
-  myId: createClientId(),
-  ws: null,
-  manualClose: false,
-  retryJoinAfterClose: false,
-  reconnectTimer: null,
-  reconnectAttempts: 0,
-  roomId: null,
-  roomState: 'idle',
-  lastMembers: [],
-  localStream: null,
-  screenStream: null,
-  usingScreen: false,
-  muted: false,
-  cameraOff: false,
-  recorder: null,
-  recordedChunks: [],
-  peers: new Map()
-};
+// 使用新的状态管理器
+const appState = createAppState({ myId: createClientId() });
 
 if (elements.idEl) {
-  elements.idEl.textContent = state.myId;
+  elements.idEl.textContent = appState.getMyId();
 }
 
 const ui = createUI({
   capabilities: capabilities,
   elements: elements,
   roomStateText: ROOM_STATE_TEXT,
-  state: state
+  appState: appState
 });
 
 function sendSignal(payload) {
-  if (!state.ws || state.ws.readyState !== WebSocket.OPEN || !state.roomId) {
+  if (!appState.room.isWebSocketOpen() || !appState.room.getRoomId()) {
     return false;
   }
-  state.ws.send(JSON.stringify(Object.assign({ room: state.roomId, from: state.myId }, payload)));
+  const ws = appState.room.getWebSocket();
+  ws.send(JSON.stringify(Object.assign({ room: appState.room.getRoomId(), from: appState.getMyId() }, payload)));
   return true;
 }
 
 const media = createMediaController({
   capabilities: capabilities,
   elements: elements,
-  state: state,
+  appState: appState,
   ui: ui
 });
 
-const stats = createStatsController(state);
+const stats = createStatsController(appState);
+
+const chat = createChatController({
+  appState: appState,
+  ui: ui
+});
 
 const peers = createPeerController({
+  chat: chat,
   media: media,
   rtcConfig: rtcConfig,
   sendSignal: sendSignal,
-  state: state,
+  appState: appState,
   ui: ui
 });
 
@@ -78,7 +70,7 @@ const signaling = createSignalingController({
   media: media,
   peerController: peers,
   reconnectDelaysMs: RECONNECT_DELAYS_MS,
-  state: state,
+  appState: appState,
   statsController: stats,
   ui: ui
 });
@@ -86,15 +78,16 @@ const signaling = createSignalingController({
 function bindEvents() {
   if (elements.joinBtn) {
     elements.joinBtn.addEventListener('click', function () {
-      if (state.roomState !== 'idle') {
+      if (!appState.room.isIdle()) {
         signaling.leaveRoom();
         return;
       }
-      state.roomId = elements.roomInput ? elements.roomInput.value.trim() : '';
-      if (!state.roomId) {
+      const roomId = elements.roomInput ? elements.roomInput.value.trim() : '';
+      if (!roomId) {
         ui.setError('请输入房间名');
         return;
       }
+      appState.room.setRoomId(roomId);
       signaling.connectWS();
     });
   }
@@ -108,7 +101,7 @@ function bindEvents() {
   if (elements.hangupBtn) {
     elements.hangupBtn.addEventListener('click', function () {
       const target = ui.selectedPeerId();
-      if (target && state.peers.has(target)) {
+      if (target && appState.peers.has(target)) {
         peers.closePeer(target, { notify: true });
         return;
       }
@@ -118,33 +111,33 @@ function bindEvents() {
 
   if (elements.muteBtn) {
     elements.muteBtn.addEventListener('click', function () {
-      if (!state.localStream) {
+      const localStream = appState.media.getLocalStream();
+      if (!localStream) {
         return;
       }
-      state.muted = !state.muted;
-      state.localStream.getAudioTracks().forEach(function (track) {
-        track.enabled = !state.muted;
+      const muted = appState.media.toggleMuted();
+      localStream.getAudioTracks().forEach(function (track) {
+        track.enabled = !muted;
       });
-      ui.updateControls();
     });
   }
 
   if (elements.cameraBtn) {
     elements.cameraBtn.addEventListener('click', function () {
-      if (!state.localStream) {
+      const localStream = appState.media.getLocalStream();
+      if (!localStream) {
         return;
       }
-      state.cameraOff = !state.cameraOff;
-      state.localStream.getVideoTracks().forEach(function (track) {
-        track.enabled = !state.cameraOff;
+      const cameraOff = appState.media.toggleCameraOff();
+      localStream.getVideoTracks().forEach(function (track) {
+        track.enabled = !cameraOff;
       });
-      ui.updateControls();
     });
   }
 
   if (elements.screenBtn) {
     elements.screenBtn.addEventListener('click', function () {
-      if (state.usingScreen) {
+      if (appState.media.isUsingScreen()) {
         media.stopScreenShare();
         return;
       }
@@ -153,13 +146,13 @@ function bindEvents() {
   }
 
   if (elements.chatSend) {
-    elements.chatSend.addEventListener('click', peers.sendChat);
+    elements.chatSend.addEventListener('click', chat.sendChat);
   }
   if (elements.chatInput) {
     elements.chatInput.addEventListener('keydown', function (event) {
       if (event.key === 'Enter') {
         event.preventDefault();
-        peers.sendChat();
+        chat.sendChat();
       }
     });
   }
@@ -177,6 +170,5 @@ function bindEvents() {
 
 bindEvents();
 ui.initCapabilityHints();
-stats.start();
+stats.start(ui.getStatsEl.bind(ui));
 ui.renderMembers([]);
-ui.updateControls();

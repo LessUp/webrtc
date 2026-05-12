@@ -1,53 +1,53 @@
 export function createMediaController(options) {
   const capabilities = options.capabilities;
   const elements = options.elements;
-  const state = options.state;
+  const appState = options.appState;
   const ui = options.ui;
 
+  // 获取子状态引用
+  const mediaState = appState.media;
+  const peers = appState.peers;
+
   async function ensureLocalMedia() {
-    if (state.localStream) {
-      return state.localStream;
+    const localStream = mediaState.getLocalStream();
+    if (localStream) {
+      return localStream;
     }
     if (!capabilities.media) {
       throw new Error('当前浏览器不支持摄像头/麦克风采集');
     }
 
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-    state.localStream = stream;
-    state.localStream.getAudioTracks().forEach(function (track) {
-      track.enabled = !state.muted;
+    mediaState.setLocalStream(stream);
+    stream.getAudioTracks().forEach(function (track) {
+      track.enabled = !mediaState.isMuted();
     });
-    state.localStream.getVideoTracks().forEach(function (track) {
-      track.enabled = !state.cameraOff;
+    stream.getVideoTracks().forEach(function (track) {
+      track.enabled = !mediaState.isCameraOff();
     });
-    if (elements.localVideo && !state.usingScreen) {
-      elements.localVideo.srcObject = state.localStream;
+    if (elements.localVideo && !mediaState.isUsingScreen()) {
+      elements.localVideo.srcObject = stream;
     }
-    ui.updateControls();
-    return state.localStream;
+    return stream;
   }
 
-  function currentVideoTrack() {
-    if (state.usingScreen && state.screenStream) {
-      return state.screenStream.getVideoTracks()[0] || null;
-    }
-    if (!state.localStream) {
-      return null;
-    }
-    return state.localStream.getVideoTracks()[0] || null;
-  }
-
-  async function syncPeerMedia(peer) {
-    if (!peer || !peer.pc || !state.localStream) {
+  /**
+   * 同步媒体到 Peer 连接
+   * @param {Object} ctx - 上下文对象，包含 pc 属性
+   */
+  async function syncPeerMedia(ctx) {
+    const localStream = mediaState.getLocalStream();
+    const pc = ctx ? ctx.pc : null;
+    if (!pc || !localStream) {
       return;
     }
 
-    state.localStream.getAudioTracks().forEach(function (track) {
-      const sender = peer.pc.getSenders().find(function (item) {
+    localStream.getAudioTracks().forEach(function (track) {
+      const sender = pc.getSenders().find(function (item) {
         return item.track && item.track.kind === 'audio';
       });
       if (!sender) {
-        peer.pc.addTrack(track, state.localStream);
+        pc.addTrack(track, localStream);
       } else if (sender.track !== track) {
         sender.replaceTrack(track).catch(function (err) {
           console.warn('replaceTrack(audio) failed:', err);
@@ -55,15 +55,15 @@ export function createMediaController(options) {
       }
     });
 
-    const videoTrack = currentVideoTrack();
+    const videoTrack = mediaState.getCurrentVideoTrack();
     if (!videoTrack) {
       return;
     }
-    const videoSender = peer.pc.getSenders().find(function (item) {
+    const videoSender = pc.getSenders().find(function (item) {
       return item.track && item.track.kind === 'video';
     });
     if (!videoSender) {
-      peer.pc.addTrack(videoTrack, state.usingScreen && state.screenStream ? state.screenStream : state.localStream);
+      pc.addTrack(videoTrack, mediaState.isUsingScreen() && mediaState.getScreenStream() ? mediaState.getScreenStream() : localStream);
       return;
     }
     if (videoSender.track !== videoTrack) {
@@ -72,29 +72,32 @@ export function createMediaController(options) {
   }
 
   async function syncAllPeerMedia() {
-    const peers = Array.from(state.peers.values());
-    for (const peer of peers) {
+    const peerList = peers.values();
+    for (const peerState of peerList) {
       try {
-        await syncPeerMedia(peer);
+        const pc = peerState.getPeerConnection();
+        if (pc) {
+          await syncPeerMedia({ pc: pc });
+        }
       } catch (err) {
-        console.warn('syncPeerMedia failed for', peer.id, err);
+        console.warn('syncPeerMedia failed for', peerState.peerId, err);
       }
     }
   }
 
   function stopLocalMedia() {
-    if (state.localStream) {
-      state.localStream.getTracks().forEach(function (track) {
+    const localStream = mediaState.getLocalStream();
+    if (localStream) {
+      localStream.getTracks().forEach(function (track) {
         try { track.stop(); } catch (err) { console.warn('track.stop error:', err); }
       });
     }
-    state.localStream = null;
-    if (elements.localVideo && !state.usingScreen) {
+    mediaState.setLocalStream(null);
+    if (elements.localVideo && !mediaState.isUsingScreen()) {
       elements.localVideo.srcObject = null;
     }
-    state.muted = false;
-    state.cameraOff = false;
-    ui.updateControls();
+    mediaState.setMuted(false);
+    mediaState.setCameraOff(false);
   }
 
   async function startScreenShare() {
@@ -110,8 +113,8 @@ export function createMediaController(options) {
         stream.getTracks().forEach(function (item) { item.stop(); });
         throw new Error('未获取到屏幕视频轨道');
       }
-      state.screenStream = stream;
-      state.usingScreen = true;
+      mediaState.setScreenStream(stream);
+      mediaState.setUsingScreen(true);
       track.onended = function () {
         stopScreenShare();
       };
@@ -119,7 +122,6 @@ export function createMediaController(options) {
         elements.localVideo.srcObject = stream;
       }
       await syncAllPeerMedia();
-      ui.updateControls();
       ui.setError('');
     } catch (err) {
       console.error(err);
@@ -128,30 +130,31 @@ export function createMediaController(options) {
   }
 
   function stopScreenShare() {
-    if (state.screenStream) {
-      state.screenStream.getTracks().forEach(function (track) {
+    const screenStream = mediaState.getScreenStream();
+    if (screenStream) {
+      screenStream.getTracks().forEach(function (track) {
         try { track.stop(); } catch (err) { console.warn('screen track.stop error:', err); }
       });
     }
-    state.screenStream = null;
-    state.usingScreen = false;
+    mediaState.setScreenStream(null);
+    mediaState.setUsingScreen(false);
     if (elements.localVideo) {
-      elements.localVideo.srcObject = state.localStream;
+      elements.localVideo.srcObject = mediaState.getLocalStream();
     }
     void syncAllPeerMedia();
-    ui.updateControls();
   }
 
   function getRecordStream() {
-    for (const peer of state.peers.values()) {
-      if (peer.remoteStream) {
-        return peer.remoteStream;
+    for (const peerState of peers.values()) {
+      const stream = peerState.getRemoteStream();
+      if (stream) {
+        return stream;
       }
     }
-    if (state.usingScreen && state.screenStream) {
-      return state.screenStream;
+    if (mediaState.isUsingScreen() && mediaState.getScreenStream()) {
+      return mediaState.getScreenStream();
     }
-    return state.localStream;
+    return mediaState.getLocalStream();
   }
 
   function startRecording() {
@@ -159,7 +162,7 @@ export function createMediaController(options) {
       ui.setError('当前浏览器不支持录制');
       return;
     }
-    if (state.recorder && state.recorder.state !== 'inactive') {
+    if (mediaState.isRecording()) {
       return;
     }
 
@@ -170,57 +173,55 @@ export function createMediaController(options) {
     }
 
     try {
-      state.recordedChunks = [];
-      state.recorder = new MediaRecorder(stream);
+      mediaState.clearRecordedChunks();
+      const recorder = new MediaRecorder(stream);
+      mediaState.setRecorder(recorder);
+
+      recorder.ondataavailable = function (event) {
+        if (event.data && event.data.size > 0) {
+          mediaState.addRecordedChunk(event.data);
+        }
+      };
+      recorder.onerror = function (event) {
+        const err = event.error || event;
+        ui.setError('录制出错：' + (err.message || err.name || '未知错误'));
+      };
+      recorder.onstop = function () {
+        const chunks = mediaState.getRecordedChunks().slice();
+        mediaState.setRecorder(null);
+        mediaState.clearRecordedChunks();
+        if (!chunks.length) {
+          return;
+        }
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'webrtc-recording.webm';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      };
+
+      recorder.start();
+      ui.setError('');
     } catch (err) {
       console.error(err);
       ui.setError('创建录制器失败：' + (err.message || err.name || '未知错误'));
-      return;
     }
-
-    state.recorder.ondataavailable = function (event) {
-      if (event.data && event.data.size > 0) {
-        state.recordedChunks.push(event.data);
-      }
-    };
-    state.recorder.onerror = function (event) {
-      const err = event.error || event;
-      ui.setError('录制出错：' + (err.message || err.name || '未知错误'));
-    };
-    state.recorder.onstop = function () {
-      const chunks = state.recordedChunks.slice();
-      state.recorder = null;
-      state.recordedChunks = [];
-      if (!chunks.length) {
-        ui.updateControls();
-        return;
-      }
-      const blob = new Blob(chunks, { type: 'video/webm' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'webrtc-recording.webm';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      ui.updateControls();
-    };
-
-    state.recorder.start();
-    ui.setError('');
-    ui.updateControls();
   }
 
   function stopRecording() {
-    if (!state.recorder || state.recorder.state === 'inactive') {
+    const recorder = mediaState.getRecorder();
+    if (!recorder || recorder.state === 'inactive') {
       return;
     }
-    state.recorder.stop();
+    recorder.stop();
   }
 
   return {
-    currentVideoTrack: currentVideoTrack,
+    currentVideoTrack: function () { return mediaState.getCurrentVideoTrack(); },
     ensureLocalMedia: ensureLocalMedia,
     startRecording: startRecording,
     startScreenShare: startScreenShare,

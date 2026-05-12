@@ -1,7 +1,10 @@
-export function createStatsController(state) {
+export function createStatsController(appState) {
   var pollInterval = null;
   // Use WeakMap to automatically clean up when peer connections are closed
   var prevStats = new WeakMap();
+
+  // 获取子状态引用
+  const peers = appState.peers;
 
   function formatBitrate(bytes, deltaMs) {
     if (deltaMs <= 0 || bytes < 0) return '--';
@@ -97,12 +100,12 @@ export function createStatsController(state) {
     });
   }
 
-  function renderStats(peerId, stats) {
-    var peer = state.peers.get(peerId);
-    if (!peer || !peer.statsEl) {
+  function renderStats(peerId, stats, getStatsEl) {
+    const statsEl = getStatsEl ? getStatsEl(peerId) : null;
+    if (!statsEl) {
       return;
     }
-    peer.statsEl.innerHTML =
+    statsEl.innerHTML =
       '<span>' + stats.videoBitrate + '</span>' +
       '<span>' + stats.resolution + '</span>' +
       '<span>Loss ' + stats.audioLoss + '</span>' +
@@ -110,22 +113,25 @@ export function createStatsController(state) {
       '<span>' + stats.codec + '</span>';
   }
 
-  function poll() {
-    state.peers.forEach(function (peer, peerId) {
-      if (!peer.pc || peer.pc.connectionState !== 'connected') {
+  function poll(getStatsEl) {
+    peers.forEach(function (peerState, peerId) {
+      const pc = peerState.getPeerConnection();
+      if (!pc || pc.connectionState !== 'connected') {
         return;
       }
-      computeStats(peer.pc).then(function (stats) {
-        renderStats(peerId, stats);
+      computeStats(pc).then(function (stats) {
+        renderStats(peerId, stats, getStatsEl);
       }).catch(function () {});
     });
   }
 
-  function start() {
+  function start(getStatsEl) {
     if (pollInterval) {
       return;
     }
-    pollInterval = setInterval(poll, 2000);
+    pollInterval = setInterval(function () {
+      poll(getStatsEl);
+    }, 2000);
   }
 
   function stop() {

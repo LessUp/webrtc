@@ -1,3 +1,5 @@
+import { RoomStatus } from '../state/index.js';
+
 export function getElements() {
   const byId = function (id) { return document.getElementById(id); };
   return {
@@ -23,11 +25,28 @@ export function getElements() {
   };
 }
 
+/**
+ * 创建 UI 控制器
+ * @param {Object} options - 配置选项
+ */
 export function createUI(options) {
   const capabilities = options.capabilities;
   const elements = options.elements;
   const roomStateText = options.roomStateText;
-  const state = options.state;
+  const appState = options.appState;
+
+  // 获取子状态引用
+  const room = appState.room;
+  const mediaState = appState.media;
+  const peers = appState.peers;
+
+  // UI 元素缓存（与 PeerState 分离）
+  const peerTiles = new Map();
+
+  // 订阅状态变更，自动刷新 UI
+  room.subscribe(updateControls);
+  mediaState.subscribe(updateControls);
+  peers.subscribe(updateControls);
 
   function setError(message) {
     if (elements.errorEl) {
@@ -36,40 +55,42 @@ export function createUI(options) {
   }
 
   function roomStatus() {
-    if (state.peers.size > 0) {
+    if (!peers.isEmpty()) {
       return 'calling';
     }
-    return state.roomState;
+    return room.getStatus();
   }
 
   function statusDotClass() {
-    if (state.peers.size > 0) {
+    if (!peers.isEmpty()) {
       return 'status__dot--calling';
     }
-    if (state.roomState === 'joined') {
+    const status = room.getStatus();
+    if (status === RoomStatus.JOINED) {
       return 'status__dot--joined';
     }
-    if (state.roomState === 'connecting' || state.roomState === 'reconnecting') {
+    if (status === RoomStatus.CONNECTING || status === RoomStatus.RECONNECTING) {
       return 'status__dot--connecting';
     }
     return '';
   }
 
   function updateControls() {
-    const joined = state.roomState === 'joined' || state.roomState === 'reconnecting';
-    const activeCall = state.peers.size > 0;
-    const localReady = !!state.localStream;
+    const status = room.getStatus();
+    const joined = status === RoomStatus.JOINED || status === RoomStatus.RECONNECTING;
+    const activeCall = !peers.isEmpty();
+    const localReady = mediaState.hasLocalStream();
 
     if (elements.statusEl) {
       var dotClass = statusDotClass();
       elements.statusEl.innerHTML = '<span class="status__dot ' + dotClass + '"></span>' + (roomStateText[roomStatus()] || roomStateText.idle);
     }
     if (elements.joinBtn) {
-      elements.joinBtn.textContent = state.roomState === 'idle' ? 'Join' : 'Leave';
-      elements.joinBtn.disabled = !capabilities.webSocket || !capabilities.rtc || state.roomState === 'connecting';
+      elements.joinBtn.textContent = room.isIdle() ? 'Join' : 'Leave';
+      elements.joinBtn.disabled = !capabilities.webSocket || !capabilities.rtc || status === RoomStatus.CONNECTING;
     }
     if (elements.roomInput) {
-      elements.roomInput.disabled = state.roomState !== 'idle';
+      elements.roomInput.disabled = !room.isIdle();
     }
     if (elements.remoteInput) {
       elements.remoteInput.disabled = !joined;
@@ -82,27 +103,26 @@ export function createUI(options) {
     }
     if (elements.muteBtn) {
       elements.muteBtn.disabled = !localReady;
-      elements.muteBtn.textContent = state.muted ? 'Unmute' : 'Mute';
+      elements.muteBtn.textContent = mediaState.isMuted() ? 'Unmute' : 'Mute';
     }
     if (elements.cameraBtn) {
       elements.cameraBtn.disabled = !localReady;
-      elements.cameraBtn.textContent = state.cameraOff ? 'Camera On' : 'Camera Off';
+      elements.cameraBtn.textContent = mediaState.isCameraOff() ? 'Camera On' : 'Camera Off';
     }
     if (elements.screenBtn) {
-      elements.screenBtn.disabled = !capabilities.screen || state.roomState === 'idle';
-      elements.screenBtn.textContent = state.usingScreen ? 'Stop Share' : 'Share Screen';
+      elements.screenBtn.disabled = !capabilities.screen || room.isIdle();
+      elements.screenBtn.textContent = mediaState.isUsingScreen() ? 'Stop Share' : 'Share Screen';
     }
     if (elements.recStart) {
-      elements.recStart.disabled = !capabilities.record || (state.recorder && state.recorder.state !== 'inactive');
+      elements.recStart.disabled = !capabilities.record || mediaState.isRecording();
     }
     if (elements.recStop) {
-      elements.recStop.disabled = !state.recorder || state.recorder.state === 'inactive';
+      elements.recStop.disabled = !mediaState.isRecording();
     }
   }
 
   function setRoomState(nextState) {
-    state.roomState = nextState;
-    updateControls();
+    room.setStatus(nextState);
   }
 
   function appendChat(text) {
@@ -116,13 +136,14 @@ export function createUI(options) {
   }
 
   function renderMembers(list) {
-    state.lastMembers = Array.isArray(list) ? list.slice() : [];
+    room.setLastMembers(list);
     if (!elements.membersEl) {
       return;
     }
 
+    const members = room.getLastMembers();
     elements.membersEl.replaceChildren();
-    if (!state.lastMembers.length) {
+    if (!members.length) {
       const empty = document.createElement('span');
       empty.className = 'muted';
       empty.textContent = '暂无成员';
@@ -130,11 +151,11 @@ export function createUI(options) {
       return;
     }
 
-    state.lastMembers.forEach(function (id) {
+    members.forEach(function (id) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'member-pill';
-      if (id === state.myId) {
+      if (id === appState.getMyId()) {
         btn.textContent = id + ' (你)';
         btn.disabled = true;
       } else {
@@ -153,67 +174,95 @@ export function createUI(options) {
     return elements.remoteInput ? elements.remoteInput.value.trim() : '';
   }
 
+  /**
+   * 确保 Peer 视频瓦片存在
+   * @param {string} peerId - Peer ID
+   * @returns {HTMLVideoElement|null}
+   */
   function ensureRemoteTile(peerId) {
-    const peer = state.peers.get(peerId);
-    if (!peer || !elements.videosEl) {
+    if (!elements.videosEl) {
       return null;
     }
-    if (peer.videoEl) {
-      return peer.videoEl;
+
+    // 检查是否已有瓦片
+    let tile = peerTiles.get(peerId);
+    if (tile && tile.videoEl) {
+      return tile.videoEl;
     }
 
-    const tile = document.createElement('div');
-    tile.className = 'video-tile';
-    tile.dataset.peer = peerId;
+    // 创建新的瓦片
+    const tileEl = document.createElement('div');
+    tileEl.className = 'video-tile';
+    tileEl.dataset.peer = peerId;
 
-    const label = document.createElement('div');
-    label.className = 'video-tile__label';
-    label.textContent = '远端：' + peerId;
+    const labelEl = document.createElement('div');
+    labelEl.className = 'video-tile__label';
+    labelEl.textContent = '远端：' + peerId;
 
-    const video = document.createElement('video');
-    video.autoplay = true;
-    video.playsInline = true;
+    const videoEl = document.createElement('video');
+    videoEl.autoplay = true;
+    videoEl.playsInline = true;
 
-    var statsDiv = document.createElement('div');
-    statsDiv.className = 'video-tile__stats';
+    const statsEl = document.createElement('div');
+    statsEl.className = 'video-tile__stats';
 
-    tile.appendChild(label);
-    tile.appendChild(video);
-    tile.appendChild(statsDiv);
-    elements.videosEl.appendChild(tile);
+    tileEl.appendChild(labelEl);
+    tileEl.appendChild(videoEl);
+    tileEl.appendChild(statsEl);
+    elements.videosEl.appendChild(tileEl);
 
-    peer.tileEl = tile;
-    peer.labelEl = label;
-    peer.videoEl = video;
-    peer.statsEl = statsDiv;
-    return video;
+    // 缓存 UI 元素
+    tile = { tileEl: tileEl, labelEl: labelEl, videoEl: videoEl, statsEl: statsEl };
+    peerTiles.set(peerId, tile);
+
+    return videoEl;
   }
 
-  function updatePeerLabel(peer) {
-    if (!peer || !peer.labelEl) {
+  /**
+   * 更新 Peer 标签
+   * @param {Object} peerState - PeerState 实例
+   */
+  function updatePeerLabel(peerState) {
+    if (!peerState) {
       return;
     }
-    const suffix = peer.connectionState && peer.connectionState !== 'new'
-      ? ' [' + peer.connectionState + ']'
+    const tile = peerTiles.get(peerState.peerId);
+    if (!tile || !tile.labelEl) {
+      return;
+    }
+    const connectionState = peerState.getConnectionState();
+    const suffix = connectionState && connectionState !== 'new'
+      ? ' [' + connectionState + ']'
       : '';
-    peer.labelEl.textContent = '远端：' + peer.id + suffix;
+    tile.labelEl.textContent = '远端：' + peerState.peerId + suffix;
   }
 
+  /**
+   * 移除 Peer 视频瓦片
+   * @param {string} peerId - Peer ID
+   */
   function removeRemoteTile(peerId) {
-    const peer = state.peers.get(peerId);
-    if (!peer) {
+    const tile = peerTiles.get(peerId);
+    if (!tile) {
       return;
     }
-    if (peer.videoEl) {
-      peer.videoEl.srcObject = null;
+    if (tile.videoEl) {
+      tile.videoEl.srcObject = null;
     }
-    if (peer.tileEl) {
-      peer.tileEl.remove();
+    if (tile.tileEl) {
+      tile.tileEl.remove();
     }
-    peer.videoEl = null;
-    peer.tileEl = null;
-    peer.labelEl = null;
-    peer.statsEl = null;
+    peerTiles.delete(peerId);
+  }
+
+  /**
+   * 获取 Peer 的 stats 元素
+   * @param {string} peerId - Peer ID
+   * @returns {HTMLElement|null}
+   */
+  function getStatsEl(peerId) {
+    const tile = peerTiles.get(peerId);
+    return tile ? tile.statsEl : null;
   }
 
   function initCapabilityHints() {
@@ -233,6 +282,7 @@ export function createUI(options) {
   return {
     appendChat: appendChat,
     ensureRemoteTile: ensureRemoteTile,
+    getStatsEl: getStatsEl,
     initCapabilityHints: initCapabilityHints,
     removeRemoteTile: removeRemoteTile,
     renderMembers: renderMembers,

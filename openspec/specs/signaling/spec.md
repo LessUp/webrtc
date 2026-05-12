@@ -154,6 +154,23 @@ The system SHALL enforce resource limits.
 - **WHEN** client sends message larger than 1MB
 - **THEN** connection SHALL be closed
 
+### Requirement: Rate Limiting
+
+The system SHALL enforce message rate limits per client connection.
+
+#### Scenario: Rate limit exceeded
+
+- **WHEN** client sends more than 30 messages per second
+- **OR** client sends more than 50 messages in a burst
+- **THEN** system SHALL reject excess messages with "rate_limited" error
+- **AND** system SHALL log rate limiting event
+
+#### Scenario: Rate limit reset
+
+- **WHEN** 1 second has passed since rate limit window started
+- **THEN** message counter SHALL be reset
+- **AND** client SHALL be allowed to send messages again
+
 ### Requirement: Cleanup Sequence
 
 The system SHALL follow strict cleanup order to avoid races.
@@ -189,14 +206,18 @@ type Hub struct {
 
 ```go
 type Client struct {
-    mu        sync.RWMutex
-    id        string           // Client-supplied unique ID
-    room      string           // Room name
-    connID    uint64           // Server-assigned connection ID
-    conn      *websocket.Conn
-    send      chan Message     // Outbound message buffer
-    closed    chan struct{}
-    closeOnce sync.Once
+    mu           sync.RWMutex
+    id           string           // Client-supplied unique ID
+    room         string           // Room name
+    connID       uint64           // Server-assigned connection ID
+    conn         *websocket.Conn
+    send         chan Message     // Outbound message buffer
+    closed       chan struct{}
+    closeOnce    sync.Once
+    // Rate limiting
+    msgCount     int              // Messages in current window
+    msgWindow    time.Time        // Start of current window
+    rateLimited  bool             // Currently being rate limited
 }
 ```
 
@@ -235,3 +256,27 @@ Server sets on all responses:
 - `X-Frame-Options: DENY`
 - `X-XSS-Protection: 1; mode=block`
 - `Referrer-Policy: strict-origin-when-cross-origin`
+
+---
+
+## Error Codes
+
+The following error codes may be returned in `error` messages:
+
+| Code | Description |
+|:-----|:------------|
+| `invalid_id` | Client ID format invalid (empty or exceeds 64 chars) |
+| `invalid_room` | Room name format invalid (empty, exceeds 64 chars, or contains control chars) |
+| `duplicate_id` | Client ID already exists in room |
+| `room_full` | Room has reached maximum capacity (50 clients) |
+| `room_limit_reached` | Server has reached maximum room count (1000 rooms) |
+| `already_joined` | Client is already in a room |
+| `identity_locked` | Connection identity cannot be changed after initial join |
+| `not_joined` | Client must join a room before sending messages |
+| `invalid_target` | Target client ID is empty or same as sender |
+| `target_not_found` | Target client is not in the room |
+| `room_missing` | Room no longer exists |
+| `membership_lost` | Client is no longer registered in room |
+| `rate_limited` | Too many messages, client should slow down |
+| `unknown_type` | Message type not supported |
+

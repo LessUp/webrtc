@@ -1,19 +1,14 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createPeerController } from "../src/controllers/peers.js";
+import { createChatController } from "../src/controllers/chat.js";
+import { createAppState, RoomStatus } from "../src/state/index.js";
 
-function createMockState(overrides) {
-  return Object.assign({
-    myId: 'me',
-    ws: null,
-    roomId: null,
-    roomState: 'idle',
-    localStream: null,
-    screenStream: null,
-    usingScreen: false,
-    muted: false,
-    cameraOff: false,
-    peers: new Map()
-  }, overrides || {});
+function createMockAppState(overrides) {
+  const appState = createAppState({ myId: overrides && overrides.myId ? overrides.myId : 'me' });
+  if (overrides && overrides.roomStatus) {
+    appState.room.setStatus(overrides.roomStatus);
+  }
+  return appState;
 }
 
 function createMockUI() {
@@ -24,7 +19,8 @@ function createMockUI() {
     removeRemoteTile: function () {},
     updatePeerLabel: function () {},
     updateControls: function () {},
-    selectedPeerId: function () { return ''; }
+    selectedPeerId: function () { return ''; },
+    getStatsEl: function () { return null; }
   };
 }
 
@@ -47,11 +43,29 @@ function createMockSendSignal() {
   };
 }
 
+// 创建模拟 PeerState 对象
+function createMockPeerState(peerId) {
+  return {
+    peerId: peerId,
+    polite: true,
+    getPeerConnection: function () { return { close: function () {}, connectionState: 'new' }; },
+    getDataChannel: function () { return null; },
+    setDataChannel: function () {},
+    getRemoteStream: function () { return null; },
+    getConnectionState: function () { return 'new'; },
+    close: function () {},
+    handleRemoteDescription: function () { return Promise.resolve(); },
+    handleIceCandidate: function () { return Promise.resolve(); },
+    createOffer: function () { return Promise.resolve(); },
+    createDataChannel: function () { return null; }
+  };
+}
+
 describe('app.peers', function () {
-  var state, ui, media, sendSignal, rtcConfig;
+  var appState, ui, media, sendSignal, rtcConfig;
 
   beforeEach(function () {
-    state = createMockState();
+    appState = createMockAppState();
     ui = createMockUI();
     media = createMockMedia();
     sendSignal = createMockSendSignal();
@@ -60,49 +74,47 @@ describe('app.peers', function () {
 
   describe('closePeer', function () {
     it('removes peer from state', function () {
-      var pc = { close: function () {} };
-      var peer = { id: 'p1', pc: pc, dc: null };
-      state.peers.set('p1', peer);
+      var mockPeerState = createMockPeerState('p1');
+      appState.peers.set('p1', mockPeerState);
 
-      var ctrl = createPeerController({ media: media, rtcConfig: rtcConfig, sendSignal: sendSignal.fn, state: state, ui: ui });
+      var ctrl = createPeerController({ media: media, rtcConfig: rtcConfig, sendSignal: sendSignal.fn, appState: appState, ui: ui });
       ctrl.closePeer('p1', { notify: false });
 
-      expect(state.peers.has('p1')).toBe(false);
+      expect(appState.peers.has('p1')).toBe(false);
     });
 
     it('sends hangup signal when notify is true', function () {
-      var pc = { close: function () {} };
-      var peer = { id: 'p1', pc: pc, dc: null };
-      state.peers.set('p1', peer);
+      var mockPeerState = createMockPeerState('p1');
+      appState.peers.set('p1', mockPeerState);
 
-      var ctrl = createPeerController({ media: media, rtcConfig: rtcConfig, sendSignal: sendSignal.fn, state: state, ui: ui });
+      var ctrl = createPeerController({ media: media, rtcConfig: rtcConfig, sendSignal: sendSignal.fn, appState: appState, ui: ui });
       ctrl.closePeer('p1', { notify: true });
 
       expect(sendSignal.sent.some(function (m) { return m.type === 'hangup'; })).toBe(true);
     });
 
     it('does nothing for non-existent peer', function () {
-      var ctrl = createPeerController({ media: media, rtcConfig: rtcConfig, sendSignal: sendSignal.fn, state: state, ui: ui });
+      var ctrl = createPeerController({ media: media, rtcConfig: rtcConfig, sendSignal: sendSignal.fn, appState: appState, ui: ui });
       expect(function () { ctrl.closePeer('nonexistent', { notify: false }); }).not.toThrow();
     });
   });
 
   describe('closeAllPeers', function () {
     it('removes all peers', function () {
-      state.peers.set('p1', { id: 'p1', pc: { close: function () {} }, dc: null });
-      state.peers.set('p2', { id: 'p2', pc: { close: function () {} }, dc: null });
+      appState.peers.set('p1', createMockPeerState('p1'));
+      appState.peers.set('p2', createMockPeerState('p2'));
 
-      var ctrl = createPeerController({ media: media, rtcConfig: rtcConfig, sendSignal: sendSignal.fn, state: state, ui: ui });
+      var ctrl = createPeerController({ media: media, rtcConfig: rtcConfig, sendSignal: sendSignal.fn, appState: appState, ui: ui });
       ctrl.closeAllPeers(false);
 
-      expect(state.peers.size).toBe(0);
+      expect(appState.peers.size()).toBe(0);
     });
 
     it('sends hangup for each peer when notify is true', function () {
-      state.peers.set('p1', { id: 'p1', pc: { close: function () {} }, dc: null });
-      state.peers.set('p2', { id: 'p2', pc: { close: function () {} }, dc: null });
+      appState.peers.set('p1', createMockPeerState('p1'));
+      appState.peers.set('p2', createMockPeerState('p2'));
 
-      var ctrl = createPeerController({ media: media, rtcConfig: rtcConfig, sendSignal: sendSignal.fn, state: state, ui: ui });
+      var ctrl = createPeerController({ media: media, rtcConfig: rtcConfig, sendSignal: sendSignal.fn, appState: appState, ui: ui });
       ctrl.closeAllPeers(true);
 
       var hangups = sendSignal.sent.filter(function (m) { return m.type === 'hangup'; });
@@ -114,25 +126,77 @@ describe('app.peers', function () {
     it('does nothing with empty input', function () {
       document.body.innerHTML = '<input id="chatInput" value="">';
       var errorSet = false;
-      ui = {
+      var testUI = {
         setError: function () { errorSet = true; },
         appendChat: function () {},
-        ensureRemoteTile: function () { return null; },
-        removeRemoteTile: function () {},
-        updatePeerLabel: function () {},
-        updateControls: function () {},
         selectedPeerId: function () { return ''; }
       };
-      var ctrl = createPeerController({ media: media, rtcConfig: rtcConfig, sendSignal: sendSignal.fn, state: state, ui: ui });
-      ctrl.sendChat();
+      var chat = createChatController({ appState: appState, ui: testUI });
+      chat.sendChat();
       expect(errorSet).toBe(false);
     });
 
     it('shows error when no data channels are open', function () {
       document.body.innerHTML = '<input id="chatInput" value="hello">';
-      var ctrl = createPeerController({ media: media, rtcConfig: rtcConfig, sendSignal: sendSignal.fn, state: state, ui: ui });
-      ctrl.sendChat();
+      var testUI = {
+        setError: function () {},
+        appendChat: function () {},
+        selectedPeerId: function () { return ''; }
+      };
+      var chat = createChatController({ appState: appState, ui: testUI });
+      chat.sendChat();
       // ui.setError is a no-op mock, just verify no throw
+    });
+  });
+});
+
+describe('appState', function () {
+  describe('roomState', function () {
+    it('starts with idle status', function () {
+      var appState = createAppState({ myId: 'test' });
+      expect(appState.room.getStatus()).toBe(RoomStatus.IDLE);
+      expect(appState.room.isIdle()).toBe(true);
+    });
+
+    it('can change status', function () {
+      var appState = createAppState({ myId: 'test' });
+      appState.room.setStatus(RoomStatus.CONNECTING);
+      expect(appState.room.getStatus()).toBe(RoomStatus.CONNECTING);
+      expect(appState.room.isConnecting()).toBe(true);
+    });
+  });
+
+  describe('mediaState', function () {
+    it('starts without local stream', function () {
+      var appState = createAppState({ myId: 'test' });
+      expect(appState.media.hasLocalStream()).toBe(false);
+      expect(appState.media.isMuted()).toBe(false);
+      expect(appState.media.isCameraOff()).toBe(false);
+    });
+
+    it('can toggle mute and camera', function () {
+      var appState = createAppState({ myId: 'test' });
+      expect(appState.media.toggleMuted()).toBe(true);
+      expect(appState.media.isMuted()).toBe(true);
+      expect(appState.media.toggleCameraOff()).toBe(true);
+      expect(appState.media.isCameraOff()).toBe(true);
+    });
+  });
+
+  describe('peersState', function () {
+    it('starts empty', function () {
+      var appState = createAppState({ myId: 'test' });
+      expect(appState.peers.isEmpty()).toBe(true);
+      expect(appState.peers.size()).toBe(0);
+    });
+
+    it('can add and remove peers', function () {
+      var appState = createAppState({ myId: 'test' });
+      appState.peers.set('peer1', createMockPeerState('peer1'));
+      expect(appState.peers.has('peer1')).toBe(true);
+      expect(appState.peers.size()).toBe(1);
+      appState.peers.remove('peer1');
+      expect(appState.peers.has('peer1')).toBe(false);
     });
   });
 });

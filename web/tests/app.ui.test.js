@@ -1,26 +1,25 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createUI, getElements } from "../src/controllers/ui.js";
+import { createAppState, RoomStatus } from "../src/state/index.js";
 
-function createMockState(overrides) {
-  return Object.assign({
-    myId: 'testuser',
-    ws: null,
-    manualClose: false,
-    retryJoinAfterClose: false,
-    reconnectTimer: null,
-    reconnectAttempts: 0,
-    roomId: null,
-    roomState: 'idle',
-    lastMembers: [],
-    localStream: null,
-    screenStream: null,
-    usingScreen: false,
-    muted: false,
-    cameraOff: false,
-    recorder: null,
-    recordedChunks: [],
-    peers: new Map()
-  }, overrides || {});
+function createMockAppState(overrides) {
+  const appState = createAppState({ myId: overrides && overrides.myId ? overrides.myId : 'testuser' });
+  // 设置初始状态
+  if (overrides) {
+    if (overrides.roomState) appState.room.setStatus(overrides.roomState);
+    if (overrides.localStream) appState.media.setLocalStream(overrides.localStream);
+    if (overrides.screenStream) appState.media.setScreenStream(overrides.screenStream);
+    if (overrides.usingScreen !== undefined) appState.media.setUsingScreen(overrides.usingScreen);
+    if (overrides.muted !== undefined) appState.media.setMuted(overrides.muted);
+    if (overrides.cameraOff !== undefined) appState.media.setCameraOff(overrides.cameraOff);
+    if (overrides.recorder) appState.media.setRecorder(overrides.recorder);
+    if (overrides.peers) {
+      overrides.peers.forEach(function (peer, id) {
+        appState.peers.set(id, peer);
+      });
+    }
+  }
+  return appState;
 }
 
 function createMockCapabilities() {
@@ -32,6 +31,14 @@ function createMockCapabilities() {
     record: true
   };
 }
+
+const ROOM_STATE_TEXT = {
+  idle: '未连接',
+  connecting: '连接中',
+  joined: '已加入',
+  reconnecting: '重连中',
+  calling: '通话中'
+};
 
 describe('app.ui', function () {
   beforeEach(function () {
@@ -67,47 +74,47 @@ describe('app.ui', function () {
   describe('createUI', function () {
     it('setError sets error text', function () {
       document.body.innerHTML = '<div id="error"></div>';
-      var state = createMockState();
+      var appState = createMockAppState();
       var elements = getElements();
-      var ui = createUI({ capabilities: createMockCapabilities(), elements: elements, roomStateText: {}, state: state });
+      var ui = createUI({ capabilities: createMockCapabilities(), elements: elements, roomStateText: ROOM_STATE_TEXT, appState: appState });
       ui.setError('test error');
       expect(elements.errorEl.textContent).toBe('test error');
     });
 
     it('setError clears error with empty string', function () {
       document.body.innerHTML = '<div id="error">old error</div>';
-      var state = createMockState();
+      var appState = createMockAppState();
       var elements = getElements();
-      var ui = createUI({ capabilities: createMockCapabilities(), elements: elements, roomStateText: {}, state: state });
+      var ui = createUI({ capabilities: createMockCapabilities(), elements: elements, roomStateText: ROOM_STATE_TEXT, appState: appState });
       ui.setError('');
       expect(elements.errorEl.textContent).toBe('');
     });
 
     it('setRoomState updates state and calls updateControls', function () {
       document.body.innerHTML = '<div id="status"></div><button id="join"></button>';
-      var state = createMockState();
+      var appState = createMockAppState();
       var elements = getElements();
       var ui = createUI({
         capabilities: createMockCapabilities(),
         elements: elements,
-        roomStateText: { idle: '未连接', joined: '已加入' },
-        state: state
+        roomStateText: ROOM_STATE_TEXT,
+        appState: appState
       });
-      ui.setRoomState('joined');
-      expect(state.roomState).toBe('joined');
+      ui.setRoomState(RoomStatus.JOINED);
+      expect(appState.room.getStatus()).toBe(RoomStatus.JOINED);
       expect(elements.statusEl.textContent).toContain('已加入');
       expect(elements.statusEl.querySelector('.status__dot--joined')).not.toBeNull();
     });
 
     it('updateControls disables hangup when no active peers', function () {
       document.body.innerHTML = '<button id="hangup"></button>';
-      var state = createMockState({ roomState: 'joined' });
+      var appState = createMockAppState({ roomState: RoomStatus.JOINED });
       var elements = getElements();
       var ui = createUI({
         capabilities: createMockCapabilities(),
         elements: elements,
-        roomStateText: { joined: '已加入' },
-        state: state
+        roomStateText: ROOM_STATE_TEXT,
+        appState: appState
       });
       ui.updateControls();
       expect(elements.hangupBtn.disabled).toBe(true);
@@ -115,13 +122,13 @@ describe('app.ui', function () {
 
     it('updateControls enables hangup when peers exist', function () {
       document.body.innerHTML = '<button id="hangup"></button>';
-      var state = createMockState({ roomState: 'joined', peers: new Map([['peer1', {}]]) });
+      var appState = createMockAppState({ roomState: RoomStatus.JOINED, peers: new Map([['peer1', {}]]) });
       var elements = getElements();
       var ui = createUI({
         capabilities: createMockCapabilities(),
         elements: elements,
-        roomStateText: { joined: '已加入' },
-        state: state
+        roomStateText: ROOM_STATE_TEXT,
+        appState: appState
       });
       ui.updateControls();
       expect(elements.hangupBtn.disabled).toBe(false);
@@ -129,18 +136,18 @@ describe('app.ui', function () {
 
     it('renderMembers shows empty message when list is empty', function () {
       document.body.innerHTML = '<div id="members"></div>';
-      var state = createMockState();
+      var appState = createMockAppState();
       var elements = getElements();
-      var ui = createUI({ capabilities: createMockCapabilities(), elements: elements, roomStateText: {}, state: state });
+      var ui = createUI({ capabilities: createMockCapabilities(), elements: elements, roomStateText: ROOM_STATE_TEXT, appState: appState });
       ui.renderMembers([]);
       expect(elements.membersEl.textContent).toContain('暂无成员');
     });
 
     it('renderMembers renders member buttons', function () {
       document.body.innerHTML = '<div id="members"></div>';
-      var state = createMockState({ myId: 'me' });
+      var appState = createMockAppState({ myId: 'me' });
       var elements = getElements();
-      var ui = createUI({ capabilities: createMockCapabilities(), elements: elements, roomStateText: {}, state: state });
+      var ui = createUI({ capabilities: createMockCapabilities(), elements: elements, roomStateText: ROOM_STATE_TEXT, appState: appState });
       ui.renderMembers(['me', 'other']);
       var pills = elements.membersEl.querySelectorAll('.member-pill');
       expect(pills.length).toBe(2);
@@ -152,17 +159,17 @@ describe('app.ui', function () {
 
     it('selectedPeerId returns trimmed remote input value', function () {
       document.body.innerHTML = '<input id="remote" value="  peer1  ">';
-      var state = createMockState();
+      var appState = createMockAppState();
       var elements = getElements();
-      var ui = createUI({ capabilities: createMockCapabilities(), elements: elements, roomStateText: {}, state: state });
+      var ui = createUI({ capabilities: createMockCapabilities(), elements: elements, roomStateText: ROOM_STATE_TEXT, appState: appState });
       expect(ui.selectedPeerId()).toBe('peer1');
     });
 
     it('appendChat adds text to chat log', function () {
       document.body.innerHTML = '<div id="chatLog"></div>';
-      var state = createMockState();
+      var appState = createMockAppState();
       var elements = getElements();
-      var ui = createUI({ capabilities: createMockCapabilities(), elements: elements, roomStateText: {}, state: state });
+      var ui = createUI({ capabilities: createMockCapabilities(), elements: elements, roomStateText: ROOM_STATE_TEXT, appState: appState });
       ui.appendChat('hello');
       ui.appendChat('world');
       expect(elements.chatLog.children.length).toBe(2);
@@ -171,13 +178,13 @@ describe('app.ui', function () {
 
     it('initCapabilityHints shows error when WebSocket not supported', function () {
       document.body.innerHTML = '<div id="error"></div>';
-      var state = createMockState();
+      var appState = createMockAppState();
       var elements = getElements();
       var ui = createUI({
         capabilities: { webSocket: false, rtc: false, media: true, screen: true, record: true },
         elements: elements,
-        roomStateText: {},
-        state: state
+        roomStateText: ROOM_STATE_TEXT,
+        appState: appState
       });
       ui.initCapabilityHints();
       expect(elements.errorEl.textContent).toContain('不支持');
