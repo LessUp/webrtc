@@ -1,0 +1,27 @@
+---
+title: LessUp WebRTC
+---
+
+import { useEffect } from 'react'
+import { useRouter } from 'next/router'
+
+export default function RedirectPage() {
+  const router = useRouter()
+
+  useEffect(() => {
+    // Detect browser language and redirect
+    const browserLang = typeof navigator !== 'undefined' ? navigator.language.toLowerCase() : 'en'
+    const targetPath = browserLang.startsWith('zh') ? '/zh' : '/en'
+    router.replace(targetPath)
+  }, [router])
+
+  return (
+    <div className="flex items-center justify-center min-h-[50vh]">
+      <div className="text-center">
+        <div className="animate-pulse text-lg text-gray-500">
+          Loading...
+        </div>
+      </div>
+    </div>
+  )
+}

@@ -1,0 +1,76 @@
+---
+title: LessUp WebRTC
+description: A compact WebRTC demo with Go signaling and vanilla JS
+---
+
+import { Hero } from '../../components/Hero'
+import { FeatureCard } from '../../components/FeatureCard'
+import { Callout } from 'nextra/components'
+
+<Hero
+  title="LessUp WebRTC"
+  subtitle="Go Signaling + Vanilla JavaScript"
+  description="A compact WebRTC demo focused on readable signaling, browser-side media features, OpenSpec-driven maintenance, and clear documentation."
+  primaryCta={{ text: "View on GitHub", href: "https://github.com/LessUp/webrtc" }}
+  secondaryCta={{ text: "Documentation", href: "/webrtc/en/guide" }}
+  stats={[
+    { value: "Go", label: "Backend", color: "text-primary-500" },
+    { value: "JS", label: "Frontend", color: "text-accent-500" },
+    { value: "50", label: "Max/room", color: "text-warning-500" },
+    { value: "MIT", label: "License", color: "text-primary-500" },
+  ]}
+/>
+
+## A compact WebRTC project you can actually read
+
+LessUp WebRTC is built for developers who want a practical reference implementation rather than a large product stack. It keeps the runtime simple and pushes repository rigor into specs, docs, and automation.
+
+### What you get
+
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+  <FeatureCard
+    icon="🔌"
+    title="Go signaling server"
+    description="Room management, identity binding, origin validation, rate limiting, and health endpoints."
+  />
+  <FeatureCard
+    icon="🎥"
+    title="Browser media features"
+    description="Camera, microphone, screen share, recording, and peer-to-peer chat."
+  />
+  <FeatureCard
+    icon="🧩"
+    title="Vanilla JS modules"
+    description="No frontend framework, no bundler, and a small module graph rooted in web/src/core/app.js."
+  />
+  <FeatureCard
+    icon="📋"
+    title="OpenSpec workflow"
+    description="Main specs, change proposals, and task-driven implementation live in openspec/."
+  />
+</div>
+
+<Callout type="info">
+  Production ready — v1.0.0 stable release with Docker, Kubernetes, and Fly.io support.
+</Callout>
+
+## Quick Links
+
+| Resource | Description |
+|:---------|:------------|
+| [Technical Guide](/webrtc/en/guide) | Architecture, module boundaries, runtime flow |
+| [Signaling Protocol](/webrtc/en/signaling) | Join flow, room updates, relay rules |
+| [Deployment](/webrtc/en/deployment) | Local run, Docker, TURN/WSS config |
+| [API Reference](/webrtc/en/api) | Server and client API documentation |
+| [OpenSpec Hub](/webrtc/en/specs) | Capability specs and change workflow |
+
+## Development model
+
+This repository is maintained with a **closeout-style OpenSpec workflow**:
+
+1. define or update behavior in `openspec/`
+2. implement against the change tasks
+3. run focused validation
+4. review before merge
+
+That keeps the code, docs, and public project surfaces aligned while the project stays intentionally small.

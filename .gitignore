@@ -49,6 +49,12 @@ _site/
 .jekyll-cache/
 .jekyll-metadata
 
+# Nextra / Next.js
+docs/website/.next/
+docs/website/node_modules/
+docs/.site/
+.next/
+
 # Environment & secrets
 .env
 .env.*
