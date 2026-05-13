@@ -7,6 +7,7 @@
  */
 
 import { ClientMessageType } from '../protocol/message.js';
+import { createBrowserApi } from '../browserApi.js';
 
 /**
  * 连接状态枚举
@@ -33,6 +34,7 @@ export const PeerConnectionState = {
  * @param {Function} options.callbacks.onTrack - 接收轨道回调
  * @param {Function} options.callbacks.onDataChannel - DataChannel 创建回调
  * @param {Function} options.callbacks.onConnectionStateChange - 连接状态变化回调
+ * @param {Object} options.browserApi - 浏览器 API 抽象（可选）
  * @returns {Object} PeerState 实例
  */
 export function createPeerState(options) {
@@ -40,6 +42,7 @@ export function createPeerState(options) {
   const myId = options.myId;
   const rtcConfig = options.rtcConfig;
   const callbacks = options.callbacks || {};
+  const browserApi = options.browserApi || createBrowserApi();
 
   // Perfect Negotiation 状态
   const polite = myId.localeCompare(peerId) > 0;
@@ -100,7 +103,7 @@ export function createPeerState(options) {
       return pc;
     }
 
-    pc = new RTCPeerConnection(rtcConfig);
+    pc = browserApi.createPeerConnection(rtcConfig);
 
     // ICE 候选
     pc.onicecandidate = function (event) {

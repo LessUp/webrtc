@@ -92,6 +92,15 @@ func (c *Client) sendError(err *ProtocolError) error {
 	return c.enqueue(Message{Type: MsgTypeError, Room: room, Code: err.Code, Error: err.Message})
 }
 
+// sendErrorAndLog sends an error message to the client and logs if sending fails.
+func (c *Client) sendErrorAndLog(err *ProtocolError) error {
+	sendErr := c.sendError(err)
+	if sendErr != nil {
+		log.Printf("signal: failed to send %s error to conn=%d: %v", err.Code, c.connID, sendErr)
+	}
+	return sendErr
+}
+
 // enqueue queues a message for sending to the client.
 func (c *Client) enqueue(msg Message) error {
 	select {

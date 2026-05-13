@@ -154,15 +154,15 @@ describe('appState', function () {
   describe('roomState', function () {
     it('starts with idle status', function () {
       var appState = createAppState({ myId: 'test' });
-      expect(appState.room.getStatus()).toBe(RoomStatus.IDLE);
-      expect(appState.room.isIdle()).toBe(true);
+      expect(appState.room.status).toBe(RoomStatus.IDLE);
+      expect(appState.room.isIdle).toBe(true);
     });
 
     it('can change status', function () {
       var appState = createAppState({ myId: 'test' });
-      appState.room.setStatus(RoomStatus.CONNECTING);
-      expect(appState.room.getStatus()).toBe(RoomStatus.CONNECTING);
-      expect(appState.room.isConnecting()).toBe(true);
+      appState.room.status = RoomStatus.CONNECTING;
+      expect(appState.room.status).toBe(RoomStatus.CONNECTING);
+      expect(appState.room.isConnecting).toBe(true);
     });
   });
 

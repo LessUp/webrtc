@@ -12,35 +12,35 @@ describe('state subscribe/notify', function () {
       room = createRoomState({ myId: 'test' });
     });
 
-    it('notifies on setStatus', function () {
+    it('notifies on status change', function () {
       var called = false;
       room.subscribe(function () { called = true; });
-      room.setStatus('connecting');
+      room.status = 'connecting';
       expect(called).toBe(true);
     });
 
-    it('notifies on setRoomId', function () {
+    it('notifies on roomId change', function () {
       var called = false;
       room.subscribe(function () { called = true; });
-      room.setRoomId('room1');
+      room.roomId = 'room1';
       expect(called).toBe(true);
     });
 
     it('unsubscribes correctly', function () {
       var count = 0;
       var unsub = room.subscribe(function () { count++; });
-      room.setStatus('connecting');
+      room.status = 'connecting';
       expect(count).toBe(1);
       unsub();
-      room.setStatus('joined');
+      room.status = 'joined';
       expect(count).toBe(1);
     });
 
     it('notifies once on reset', function () {
       var count = 0;
       room.subscribe(function () { count++; });
-      room.setStatus('joined');
-      room.setRoomId('room1');
+      room.status = 'joined';
+      room.roomId = 'room1';
       count = 0; // reset counter
       room.reset();
       expect(count).toBe(1);
@@ -51,12 +51,32 @@ describe('state subscribe/notify', function () {
       room.subscribe(function () {
         count++;
         // This would cause infinite recursion without anti-reentrancy
-        room.setRoomId('nested');
+        room.roomId = 'nested';
       });
-      room.setStatus('connecting');
-      // Should be 2: first from setStatus, then from setRoomId inside callback
-      // But the setRoomId notification is suppressed by anti-reentrancy
+      room.status = 'connecting';
+      // Should be 2: first from status change, then from roomId inside callback
+      // But the roomId notification is suppressed by anti-reentrancy
       expect(count).toBe(1);
+    });
+
+    it('computes isIdle correctly', function () {
+      expect(room.isIdle).toBe(true);
+      room.status = 'joined';
+      expect(room.isIdle).toBe(false);
+    });
+
+    it('computes isConnected correctly', function () {
+      expect(room.isConnected).toBe(false);
+      room.status = 'joined';
+      expect(room.isConnected).toBe(true);
+    });
+
+    it('computes isConnecting correctly', function () {
+      expect(room.isConnecting).toBe(false);
+      room.status = 'connecting';
+      expect(room.isConnecting).toBe(true);
+      room.status = 'reconnecting';
+      expect(room.isConnecting).toBe(true);
     });
   });
 
@@ -148,7 +168,7 @@ describe('state subscribe/notify', function () {
       appState.media.subscribe(function () { mediaNotified = true; });
       appState.peers.subscribe(function () { peersNotified = true; });
 
-      appState.room.setStatus('connecting');
+      appState.room.status = 'connecting';
       appState.media.toggleMuted();
       appState.peers.set('p1', {});
 

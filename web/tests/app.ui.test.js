@@ -6,7 +6,7 @@ function createMockAppState(overrides) {
   const appState = createAppState({ myId: overrides && overrides.myId ? overrides.myId : 'testuser' });
   // 设置初始状态
   if (overrides) {
-    if (overrides.roomState) appState.room.setStatus(overrides.roomState);
+    if (overrides.roomState) appState.room.status = overrides.roomState;
     if (overrides.localStream) appState.media.setLocalStream(overrides.localStream);
     if (overrides.screenStream) appState.media.setScreenStream(overrides.screenStream);
     if (overrides.usingScreen !== undefined) appState.media.setUsingScreen(overrides.usingScreen);
@@ -101,7 +101,7 @@ describe('app.ui', function () {
         appState: appState
       });
       ui.setRoomState(RoomStatus.JOINED);
-      expect(appState.room.getStatus()).toBe(RoomStatus.JOINED);
+      expect(appState.room.status).toBe(RoomStatus.JOINED);
       expect(elements.statusEl.textContent).toContain('已加入');
       expect(elements.statusEl.querySelector('.status__dot--joined')).not.toBeNull();
     });

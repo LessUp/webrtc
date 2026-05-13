@@ -14,6 +14,7 @@ export function createPeerController(options) {
   const appState = options.appState;
   const ui = options.ui;
   const chat = options.chat; // 可选：聊天控制器
+  const browserApi = options.browserApi; // 可选：浏览器 API 抽象
 
   // 获取子状态引用
   const room = appState.room;
@@ -35,6 +36,7 @@ export function createPeerController(options) {
       peerId: peerId,
       myId: appState.getMyId(),
       rtcConfig: rtcConfig,
+      browserApi: browserApi,
       callbacks: {
         onIceCandidate: function (candidate) {
           sendSignal({ type: ClientMessageType.CANDIDATE, to: peerId, candidate: candidate });

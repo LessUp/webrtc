@@ -95,14 +95,35 @@ components:
           enum:
             - invalid_id
             - invalid_room
-            - identity_locked
-            - already_joined
+            - invalid_join
             - duplicate_id
             - room_full
             - room_limit_reached
+            - room_missing
+            - already_joined
+            - identity_locked
             - not_joined
             - invalid_target
             - target_not_found
+            - membership_lost
+            - unknown_type
+            - rate_limited
+          x-comments:
+            invalid_id: 客户端 ID 格式无效
+            invalid_room: 房间名格式无效
+            invalid_join: 加入请求缺少必要字段
+            duplicate_id: 房间内 ID 已存在
+            room_full: 房间已满（50 人）
+            room_limit_reached: 系统房间上限（1000）
+            room_missing: 房间不存在
+            already_joined: 已在房间中
+            identity_locked: 身份已绑定不可更改
+            not_joined: 未加入房间
+            invalid_target: 目标客户端无效
+            target_not_found: 目标客户端不在房间
+            membership_lost: 客户端已从房间移除
+            unknown_type: 消息类型不支持
+            rate_limited: 消息发送过快
         error:
           type: string
 

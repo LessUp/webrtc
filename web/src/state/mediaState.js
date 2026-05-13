@@ -3,35 +3,23 @@
  * 管理本地媒体流、屏幕共享和录制状态。
  */
 
+import { createObservable } from './observable.js';
+
 /**
  * 创建媒体状态管理器
  * @returns {Object} 媒体状态接口
  */
 export function createMediaState() {
+  var observable = createObservable();
+
   // 私有状态
-  let _localStream = null;
-  let _screenStream = null;
-  let _usingScreen = false;
-  let _muted = false;
-  let _cameraOff = false;
-  let _recorder = null;
-  let _recordedChunks = [];
-
-  // 订阅机制
-  const _subscribers = new Set();
-  let _notifying = false;
-
-  function subscribe(fn) {
-    _subscribers.add(fn);
-    return function () { _subscribers.delete(fn); };
-  }
-
-  function notify() {
-    if (_notifying) return;
-    _notifying = true;
-    try { _subscribers.forEach(function (fn) { fn(); }); }
-    finally { _notifying = false; }
-  }
+  var _localStream = null;
+  var _screenStream = null;
+  var _usingScreen = false;
+  var _muted = false;
+  var _cameraOff = false;
+  var _recorder = null;
+  var _recordedChunks = [];
 
   /**
    * 获取当前状态快照
@@ -51,38 +39,16 @@ export function createMediaState() {
 
   // === 本地流 ===
 
-  function getLocalStream() {
-    return _localStream;
-  }
-
-  function setLocalStream(stream) {
-    _localStream = stream;
-    notify();
-  }
-
-  function hasLocalStream() {
-    return !!_localStream;
-  }
+  function getLocalStream() { return _localStream; }
+  function setLocalStream(stream) { _localStream = stream; observable.notify(); }
+  function hasLocalStream() { return !!_localStream; }
 
   // === 屏幕流 ===
 
-  function getScreenStream() {
-    return _screenStream;
-  }
-
-  function setScreenStream(stream) {
-    _screenStream = stream;
-    notify();
-  }
-
-  function isUsingScreen() {
-    return _usingScreen;
-  }
-
-  function setUsingScreen(value) {
-    _usingScreen = value;
-    notify();
-  }
+  function getScreenStream() { return _screenStream; }
+  function setScreenStream(stream) { _screenStream = stream; observable.notify(); }
+  function isUsingScreen() { return _usingScreen; }
+  function setUsingScreen(value) { _usingScreen = value; observable.notify(); }
 
   /**
    * 获取当前视频轨道
@@ -100,69 +66,22 @@ export function createMediaState() {
 
   // === 静音/摄像头 ===
 
-  function isMuted() {
-    return _muted;
-  }
-
-  function setMuted(value) {
-    _muted = value;
-    notify();
-  }
-
-  function toggleMuted() {
-    _muted = !_muted;
-    notify();
-    return _muted;
-  }
-
-  function isCameraOff() {
-    return _cameraOff;
-  }
-
-  function setCameraOff(value) {
-    _cameraOff = value;
-    notify();
-  }
-
-  function toggleCameraOff() {
-    _cameraOff = !_cameraOff;
-    notify();
-    return _cameraOff;
-  }
+  function isMuted() { return _muted; }
+  function setMuted(value) { _muted = value; observable.notify(); }
+  function toggleMuted() { _muted = !_muted; observable.notify(); return _muted; }
+  function isCameraOff() { return _cameraOff; }
+  function setCameraOff(value) { _cameraOff = value; observable.notify(); }
+  function toggleCameraOff() { _cameraOff = !_cameraOff; observable.notify(); return _cameraOff; }
 
   // === 录制 ===
 
-  function getRecorder() {
-    return _recorder;
-  }
-
-  function setRecorder(recorder) {
-    _recorder = recorder;
-    notify();
-  }
-
-  function isRecording() {
-    return _recorder && _recorder.state !== 'inactive';
-  }
-
-  function getRecordedChunks() {
-    return _recordedChunks;
-  }
-
-  function setRecordedChunks(chunks) {
-    _recordedChunks = chunks;
-    notify();
-  }
-
-  function addRecordedChunk(chunk) {
-    _recordedChunks.push(chunk);
-    notify();
-  }
-
-  function clearRecordedChunks() {
-    _recordedChunks = [];
-    notify();
-  }
+  function getRecorder() { return _recorder; }
+  function setRecorder(recorder) { _recorder = recorder; observable.notify(); }
+  function isRecording() { return _recorder && _recorder.state !== 'inactive'; }
+  function getRecordedChunks() { return _recordedChunks; }
+  function setRecordedChunks(chunks) { _recordedChunks = chunks; observable.notify(); }
+  function addRecordedChunk(chunk) { _recordedChunks.push(chunk); observable.notify(); }
+  function clearRecordedChunks() { _recordedChunks = []; observable.notify(); }
 
   // === 重置 ===
 
@@ -186,12 +105,12 @@ export function createMediaState() {
     _cameraOff = false;
     _recorder = null;
     _recordedChunks = [];
-    notify();
+    observable.notify();
   }
 
   return {
     // 订阅
-    subscribe: subscribe,
+    subscribe: observable.subscribe,
 
     // 快照
     getSnapshot: getSnapshot,

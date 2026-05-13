@@ -3,29 +3,17 @@
  * 管理 WebRTC Peer 连接集合。
  */
 
+import { createObservable } from './observable.js';
+
 /**
  * 创建 Peer 状态管理器
  * @returns {Object} Peer 状态接口
  */
 export function createPeersState() {
+  var observable = createObservable();
+
   // 私有状态
-  const _peers = new Map();
-
-  // 订阅机制
-  const _subscribers = new Set();
-  let _notifying = false;
-
-  function subscribe(fn) {
-    _subscribers.add(fn);
-    return function () { _subscribers.delete(fn); };
-  }
-
-  function notify() {
-    if (_notifying) return;
-    _notifying = true;
-    try { _subscribers.forEach(function (fn) { fn(); }); }
-    finally { _notifying = false; }
-  }
+  var _peers = new Map();
 
   /**
    * 获取当前状态快照
@@ -40,61 +28,35 @@ export function createPeersState() {
 
   // === Peer 管理 ===
 
-  function get(peerId) {
-    return _peers.get(peerId);
-  }
-
-  function set(peerId, peer) {
-    _peers.set(peerId, peer);
-    notify();
-  }
-
-  function has(peerId) {
-    return _peers.has(peerId);
-  }
-
+  function get(peerId) { return _peers.get(peerId); }
+  function set(peerId, peer) { _peers.set(peerId, peer); observable.notify(); }
+  function has(peerId) { return _peers.has(peerId); }
   function remove(peerId) {
     var result = _peers.delete(peerId);
-    if (result) notify();
+    if (result) observable.notify();
     return result;
   }
-
-  function clear() {
-    _peers.clear();
-    notify();
-  }
-
-  function size() {
-    return _peers.size;
-  }
-
-  function isEmpty() {
-    return _peers.size === 0;
-  }
+  function clear() { _peers.clear(); observable.notify(); }
+  function size() { return _peers.size; }
+  function isEmpty() { return _peers.size === 0; }
 
   /**
    * 获取所有 Peer ID
    * @returns {string[]}
    */
-  function keys() {
-    return Array.from(_peers.keys());
-  }
+  function keys() { return Array.from(_peers.keys()); }
 
   /**
    * 获取所有 Peer 对象
    * @returns {Object[]}
    */
-  function values() {
-    return Array.from(_peers.values());
-  }
+  function values() { return Array.from(_peers.values()); }
 
   /**
    * 遍历所有 Peer
    * @param {Function} callback - 回调函数 (peer, peerId) => void
    */
-  function forEach(callback) {
-    _peers.forEach(callback);
-  }
+  function forEach(callback) { _peers.forEach(callback); }
 
   /**
    * 获取活跃 Peer 的 ID 列表（排除自身）
@@ -122,7 +84,7 @@ export function createPeersState() {
 
   return {
     // 订阅
-    subscribe: subscribe,
+    subscribe: observable.subscribe,
 
     // 快照
     getSnapshot: getSnapshot,

@@ -1,5 +1,6 @@
 import { RoomStatus } from '../state/index.js';
 import { ServerMessageType, ClientMessageType, ErrorCode, parseMessage } from '../protocol/message.js';
+import { createBrowserApi } from '../browserApi.js';
 
 export function createSignalingController(options) {
   const capabilities = options.capabilities;
@@ -9,6 +10,7 @@ export function createSignalingController(options) {
   const appState = options.appState;
   const statsController = options.statsController;
   const ui = options.ui;
+  const browserApi = options.browserApi || createBrowserApi();
 
   // 获取子状态引用
   const room = appState.room;
@@ -16,16 +18,16 @@ export function createSignalingController(options) {
   const mediaState = appState.media;
 
   function scheduleReconnect() {
-    if (!room.getRoomId() || room.getReconnectTimer()) {
+    if (!room.roomId || room.reconnectTimer) {
       return;
     }
-    const attempts = room.getReconnectAttempts();
+    const attempts = room.reconnectAttempts;
     const delay = reconnectDelaysMs[Math.min(attempts, reconnectDelaysMs.length - 1)];
-    room.setReconnectTimer(window.setTimeout(function () {
-      room.setReconnectTimer(null);
+    room.reconnectTimer = browserApi.setTimeout(function () {
+      room.reconnectTimer = null;
       room.incrementReconnectAttempts();
       connectWS();
-    }, delay));
+    }, delay);
   }
 
   function connectWS() {
@@ -33,25 +35,26 @@ export function createSignalingController(options) {
       ui.setError('当前浏览器不支持 WebRTC 或 WebSocket');
       return;
     }
-    if (!room.getRoomId()) {
+    if (!room.roomId) {
       return;
     }
-    if (room.isWebSocketConnecting()) {
+    if (room.isWebSocketConnecting) {
       return;
     }
 
-    room.clearReconnectTimer();
-    room.setStatus(room.getStatus() === RoomStatus.RECONNECTING ? RoomStatus.RECONNECTING : RoomStatus.CONNECTING);
+    room.clearReconnectTimer(browserApi.clearTimeout);
+    room.status = room.status === RoomStatus.RECONNECTING ? RoomStatus.RECONNECTING : RoomStatus.CONNECTING;
 
-    const proto = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-    const ws = new WebSocket(proto + window.location.host + '/ws');
-    room.setWebSocket(ws);
+    const location = browserApi.getLocation();
+    const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+    const ws = browserApi.createWebSocket(proto + location.host + '/ws');
+    room.ws = ws;
 
     ws.onopen = function () {
       try {
         ws.send(JSON.stringify({
           type: ClientMessageType.JOIN,
-          room: room.getRoomId(),
+          room: room.roomId,
           from: appState.getMyId()
         }));
       } catch (err) {
@@ -70,7 +73,7 @@ export function createSignalingController(options) {
       switch (msg.type) {
         case ServerMessageType.JOINED:
           room.resetReconnectAttempts();
-          room.setStatus(RoomStatus.JOINED);
+          room.status = RoomStatus.JOINED;
           ui.setError('');
           break;
 
@@ -116,20 +119,20 @@ export function createSignalingController(options) {
 
         case ServerMessageType.ERROR:
           ui.setError(msg.error || '信令请求失败');
-          if (msg.code === ErrorCode.DUPLICATE_ID && room.isConnecting()) {
-            room.setRetryJoinAfterClose(true);
-            room.setManualClose(true);
-            room.setStatus(RoomStatus.RECONNECTING);
+          if (msg.code === ErrorCode.DUPLICATE_ID && room.isConnecting) {
+            room.retryJoinAfterClose = true;
+            room.manualClose = true;
+            room.status = RoomStatus.RECONNECTING;
             try { ws.close(); } catch (err) { console.warn('ws.close error:', err); }
             break;
           }
-          if (room.isConnecting()) {
-            room.setManualClose(true);
+          if (room.isConnecting) {
+            room.manualClose = true;
             ws.close();
-            room.setWebSocket(null);
-            room.setRoomId(null);
+            room.ws = null;
+            room.roomId = null;
             ui.renderMembers([]);
-            room.setStatus(RoomStatus.IDLE);
+            room.status = RoomStatus.IDLE;
           }
           break;
 
@@ -145,18 +148,18 @@ export function createSignalingController(options) {
     };
 
     ws.onclose = function () {
-      const retryJoinAfterClose = room.getRetryJoinAfterClose();
-      const wasManual = room.getManualClose();
-      room.setRetryJoinAfterClose(false);
-      room.setManualClose(false);
-      room.setWebSocket(null);
-      room.clearReconnectTimer();
-      if ((wasManual && !retryJoinAfterClose) || !room.getRoomId()) {
+      const retryJoinAfterClose = room.retryJoinAfterClose;
+      const wasManual = room.manualClose;
+      room.retryJoinAfterClose = false;
+      room.manualClose = false;
+      room.ws = null;
+      room.clearReconnectTimer(browserApi.clearTimeout);
+      if ((wasManual && !retryJoinAfterClose) || !room.roomId) {
         ui.renderMembers([]);
-        room.setStatus(RoomStatus.IDLE);
+        room.status = RoomStatus.IDLE;
         return;
       }
-      room.setStatus(RoomStatus.RECONNECTING);
+      room.status = RoomStatus.RECONNECTING;
       ui.setError('连接断开，正在重连…');
       scheduleReconnect();
     };
@@ -174,18 +177,18 @@ export function createSignalingController(options) {
     media.stopLocalMedia();
     ui.renderMembers([]);
     ui.setError('');
-    room.clearReconnectTimer();
+    room.clearReconnectTimer(browserApi.clearTimeout);
     const remoteInput = document.getElementById('remote');
     if (remoteInput) {
       remoteInput.value = '';
     }
-    const ws = room.getWebSocket();
+    const ws = room.ws;
     if (ws) {
-      room.setManualClose(true);
+      room.manualClose = true;
       try {
         ws.send(JSON.stringify({
           type: ClientMessageType.LEAVE,
-          room: room.getRoomId(),
+          room: room.roomId,
           from: appState.getMyId()
         }));
       } catch (err) {
@@ -193,9 +196,9 @@ export function createSignalingController(options) {
       }
       try { ws.close(); } catch (err) { console.warn('ws.close error:', err); }
     }
-    room.setWebSocket(null);
-    room.setRoomId(null);
-    room.setStatus(RoomStatus.IDLE);
+    room.ws = null;
+    room.roomId = null;
+    room.status = RoomStatus.IDLE;
   }
 
   return {

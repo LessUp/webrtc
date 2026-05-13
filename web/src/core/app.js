@@ -13,11 +13,13 @@ import { createPeerController } from '../controllers/peers.js';
 import { createSignalingController } from '../controllers/signaling.js';
 import { createStatsController } from '../controllers/stats.js';
 import { createUI, getElements } from '../controllers/ui.js';
+import { createBrowserApi } from '../browserApi.js';
 
 const elements = getElements();
 const capabilities = getCapabilities();
 const appConfig = window.__APP_CONFIG__ || {};
 const rtcConfig = getRtcConfig(appConfig, DEFAULT_RTC_CONFIG);
+const browserApi = createBrowserApi();
 
 // 使用新的状态管理器
 const appState = createAppState({ myId: createClientId() });
@@ -46,7 +48,8 @@ const media = createMediaController({
   capabilities: capabilities,
   elements: elements,
   appState: appState,
-  ui: ui
+  ui: ui,
+  browserApi: browserApi
 });
 
 const stats = createStatsController(appState);
@@ -62,7 +65,8 @@ const peers = createPeerController({
   rtcConfig: rtcConfig,
   sendSignal: sendSignal,
   appState: appState,
-  ui: ui
+  ui: ui,
+  browserApi: browserApi
 });
 
 const signaling = createSignalingController({
@@ -72,7 +76,8 @@ const signaling = createSignalingController({
   reconnectDelaysMs: RECONNECT_DELAYS_MS,
   appState: appState,
   statsController: stats,
-  ui: ui
+  ui: ui,
+  browserApi: browserApi
 });
 
 function bindEvents() {

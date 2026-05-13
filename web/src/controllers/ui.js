@@ -58,14 +58,14 @@ export function createUI(options) {
     if (!peers.isEmpty()) {
       return 'calling';
     }
-    return room.getStatus();
+    return room.status;
   }
 
   function statusDotClass() {
     if (!peers.isEmpty()) {
       return 'status__dot--calling';
     }
-    const status = room.getStatus();
+    const status = room.status;
     if (status === RoomStatus.JOINED) {
       return 'status__dot--joined';
     }
@@ -76,7 +76,7 @@ export function createUI(options) {
   }
 
   function updateControls() {
-    const status = room.getStatus();
+    const status = room.status;
     const joined = status === RoomStatus.JOINED || status === RoomStatus.RECONNECTING;
     const activeCall = !peers.isEmpty();
     const localReady = mediaState.hasLocalStream();
@@ -86,11 +86,11 @@ export function createUI(options) {
       elements.statusEl.innerHTML = '<span class="status__dot ' + dotClass + '"></span>' + (roomStateText[roomStatus()] || roomStateText.idle);
     }
     if (elements.joinBtn) {
-      elements.joinBtn.textContent = room.isIdle() ? 'Join' : 'Leave';
+      elements.joinBtn.textContent = room.isIdle ? 'Join' : 'Leave';
       elements.joinBtn.disabled = !capabilities.webSocket || !capabilities.rtc || status === RoomStatus.CONNECTING;
     }
     if (elements.roomInput) {
-      elements.roomInput.disabled = !room.isIdle();
+      elements.roomInput.disabled = !room.isIdle;
     }
     if (elements.remoteInput) {
       elements.remoteInput.disabled = !joined;
@@ -110,7 +110,7 @@ export function createUI(options) {
       elements.cameraBtn.textContent = mediaState.isCameraOff() ? 'Camera On' : 'Camera Off';
     }
     if (elements.screenBtn) {
-      elements.screenBtn.disabled = !capabilities.screen || room.isIdle();
+      elements.screenBtn.disabled = !capabilities.screen || room.isIdle;
       elements.screenBtn.textContent = mediaState.isUsingScreen() ? 'Stop Share' : 'Share Screen';
     }
     if (elements.recStart) {
@@ -122,7 +122,7 @@ export function createUI(options) {
   }
 
   function setRoomState(nextState) {
-    room.setStatus(nextState);
+    room.status = nextState;
   }
 
   function appendChat(text) {
@@ -136,12 +136,12 @@ export function createUI(options) {
   }
 
   function renderMembers(list) {
-    room.setLastMembers(list);
+    room.lastMembers = list;
     if (!elements.membersEl) {
       return;
     }
 
-    const members = room.getLastMembers();
+    const members = room.lastMembers;
     elements.membersEl.replaceChildren();
     if (!members.length) {
       const empty = document.createElement('span');

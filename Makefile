@@ -31,8 +31,12 @@ vet:
 fmt:
 	go fmt ./...
 
+# Protocol sync check
+protocol-sync:
+	@./scripts/check-protocol-sync.sh
+
 # All checks (run before commit)
-check: build test lint vet
+check: build test lint vet protocol-sync
 
 # Development with hot reload (requires air)
 dev:
@@ -42,4 +46,4 @@ dev:
 clean:
 	rm -f coverage.out coverage.html
 
-.PHONY: build run test test-cover lint vet fmt check dev clean
+.PHONY: build run test test-cover lint vet fmt check dev clean protocol-sync

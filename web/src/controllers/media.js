@@ -1,8 +1,11 @@
+import { createBrowserApi } from '../browserApi.js';
+
 export function createMediaController(options) {
   const capabilities = options.capabilities;
   const elements = options.elements;
   const appState = options.appState;
   const ui = options.ui;
+  const browserApi = options.browserApi || createBrowserApi();
 
   // 获取子状态引用
   const mediaState = appState.media;
@@ -17,7 +20,7 @@ export function createMediaController(options) {
       throw new Error('当前浏览器不支持摄像头/麦克风采集');
     }
 
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    const stream = await browserApi.getUserMedia({ audio: true, video: true });
     mediaState.setLocalStream(stream);
     stream.getAudioTracks().forEach(function (track) {
       track.enabled = !mediaState.isMuted();
@@ -107,7 +110,7 @@ export function createMediaController(options) {
     }
 
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      const stream = await browserApi.getDisplayMedia({ video: true });
       const track = stream.getVideoTracks()[0];
       if (!track) {
         stream.getTracks().forEach(function (item) { item.stop(); });
@@ -174,7 +177,7 @@ export function createMediaController(options) {
 
     try {
       mediaState.clearRecordedChunks();
-      const recorder = new MediaRecorder(stream);
+      const recorder = browserApi.createMediaRecorder(stream);
       mediaState.setRecorder(recorder);
 
       recorder.ondataavailable = function (event) {

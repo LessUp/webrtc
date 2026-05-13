@@ -3,12 +3,14 @@
  * 管理房间连接的状态机，封装重连逻辑。
  */
 
+import { createObservable } from './observable.js';
+
 /**
  * 房间状态枚举
  * @readonly
  * @enum {string}
  */
-export const RoomStatus = {
+export var RoomStatus = {
   IDLE: 'idle',
   CONNECTING: 'connecting',
   JOINED: 'joined',
@@ -22,33 +24,18 @@ export const RoomStatus = {
  * @returns {Object} 房间状态接口
  */
 export function createRoomState(options) {
-  const myId = options.myId;
+  var myId = options.myId;
+  var observable = createObservable();
 
   // 私有状态
-  let _roomId = null;
-  let _status = RoomStatus.IDLE;
-  let _ws = null;
-  let _manualClose = false;
-  let _retryJoinAfterClose = false;
-  let _reconnectTimer = null;
-  let _reconnectAttempts = 0;
-  let _lastMembers = [];
-
-  // 订阅机制
-  const _subscribers = new Set();
-  let _notifying = false;
-
-  function subscribe(fn) {
-    _subscribers.add(fn);
-    return function () { _subscribers.delete(fn); };
-  }
-
-  function notify() {
-    if (_notifying) return;
-    _notifying = true;
-    try { _subscribers.forEach(function (fn) { fn(); }); }
-    finally { _notifying = false; }
-  }
+  var _roomId = null;
+  var _status = RoomStatus.IDLE;
+  var _ws = null;
+  var _manualClose = false;
+  var _retryJoinAfterClose = false;
+  var _reconnectTimer = null;
+  var _reconnectAttempts = 0;
+  var _lastMembers = [];
 
   /**
    * 获取当前状态快照
@@ -68,123 +55,9 @@ export function createRoomState(options) {
     };
   }
 
-  // === 房间 ID ===
-
-  function getRoomId() {
-    return _roomId;
-  }
-
-  function setRoomId(id) {
-    _roomId = id;
-    notify();
-  }
-
-  // === 状态 ===
-
-  function getStatus() {
-    return _status;
-  }
-
-  function setStatus(status) {
-    _status = status;
-    notify();
-  }
-
-  function isIdle() {
-    return _status === RoomStatus.IDLE;
-  }
-
-  function isConnected() {
-    return _status === RoomStatus.JOINED;
-  }
-
-  function isConnecting() {
-    return _status === RoomStatus.CONNECTING || _status === RoomStatus.RECONNECTING;
-  }
-
-  // === WebSocket ===
-
-  function getWebSocket() {
-    return _ws;
-  }
-
-  function setWebSocket(ws) {
-    _ws = ws;
-    notify();
-  }
-
-  function isWebSocketOpen() {
-    return _ws && _ws.readyState === WebSocket.OPEN;
-  }
-
-  function isWebSocketConnecting() {
-    return _ws && (_ws.readyState === WebSocket.OPEN || _ws.readyState === WebSocket.CONNECTING);
-  }
-
-  // === 重连状态 ===
-
-  function getManualClose() {
-    return _manualClose;
-  }
-
-  function setManualClose(value) {
-    _manualClose = value;
-    notify();
-  }
-
-  function getRetryJoinAfterClose() {
-    return _retryJoinAfterClose;
-  }
-
-  function setRetryJoinAfterClose(value) {
-    _retryJoinAfterClose = value;
-    notify();
-  }
-
-  function getReconnectTimer() {
-    return _reconnectTimer;
-  }
-
-  function setReconnectTimer(timer) {
-    _reconnectTimer = timer;
-    notify();
-  }
-
-  function clearReconnectTimer() {
-    if (_reconnectTimer) {
-      window.clearTimeout(_reconnectTimer);
-      _reconnectTimer = null;
-      notify();
-    }
-  }
-
-  function getReconnectAttempts() {
-    return _reconnectAttempts;
-  }
-
-  function incrementReconnectAttempts() {
-    _reconnectAttempts += 1;
-    notify();
-  }
-
-  function resetReconnectAttempts() {
-    _reconnectAttempts = 0;
-    notify();
-  }
-
-  // === 成员列表 ===
-
-  function getLastMembers() {
-    return _lastMembers.slice();
-  }
-
-  function setLastMembers(members) {
-    _lastMembers = Array.isArray(members) ? members.slice() : [];
-    notify();
-  }
-
-  // === 重置 ===
-
+  /**
+   * 重置所有状态
+   */
   function reset() {
     clearReconnectTimer();
     _ws = null;
@@ -194,53 +67,133 @@ export function createRoomState(options) {
     _retryJoinAfterClose = false;
     _reconnectAttempts = 0;
     _lastMembers = [];
-    notify();
+    observable.notify();
   }
 
-  return {
-    // 订阅
-    subscribe: subscribe,
+  /**
+   * 清除重连定时器
+   * @param {Function} [clearFn] - 可选的清除函数，默认使用 window.clearTimeout
+   */
+  function clearReconnectTimer(clearFn) {
+    if (_reconnectTimer) {
+      var clear = clearFn || window.clearTimeout.bind(window);
+      clear(_reconnectTimer);
+      _reconnectTimer = null;
+      observable.notify();
+    }
+  }
 
-    // 快照
-    getSnapshot: getSnapshot,
+  /**
+   * 增加重连尝试次数
+   */
+  function incrementReconnectAttempts() {
+    _reconnectAttempts += 1;
+    observable.notify();
+  }
 
-    // 房间 ID
-    getRoomId: getRoomId,
-    setRoomId: setRoomId,
+  /**
+   * 重置重连尝试次数
+   */
+  function resetReconnectAttempts() {
+    _reconnectAttempts = 0;
+    observable.notify();
+  }
 
-    // 状态
-    getStatus: getStatus,
-    setStatus: setStatus,
-    isIdle: isIdle,
-    isConnected: isConnected,
-    isConnecting: isConnecting,
-
-    // WebSocket
-    getWebSocket: getWebSocket,
-    setWebSocket: setWebSocket,
-    isWebSocketOpen: isWebSocketOpen,
-    isWebSocketConnecting: isWebSocketConnecting,
-
-    // 重连状态
-    getManualClose: getManualClose,
-    setManualClose: setManualClose,
-    getRetryJoinAfterClose: getRetryJoinAfterClose,
-    setRetryJoinAfterClose: setRetryJoinAfterClose,
-    getReconnectTimer: getReconnectTimer,
-    setReconnectTimer: setReconnectTimer,
-    clearReconnectTimer: clearReconnectTimer,
-    getReconnectAttempts: getReconnectAttempts,
-    incrementReconnectAttempts: incrementReconnectAttempts,
-    resetReconnectAttempts: resetReconnectAttempts,
-
-    // 成员列表
-    getLastMembers: getLastMembers,
-    setLastMembers: setLastMembers,
-
-    // 重置
-    reset: reset,
-
+  // 状态对象
+  var state = {
     // 常量
-    myId: myId
+    myId: myId,
+
+    // 方法
+    subscribe: observable.subscribe,
+    getSnapshot: getSnapshot,
+    reset: reset,
+    clearReconnectTimer: clearReconnectTimer,
+    incrementReconnectAttempts: incrementReconnectAttempts,
+    resetReconnectAttempts: resetReconnectAttempts
   };
+
+  // 计算属性：房间 ID
+  Object.defineProperty(state, 'roomId', {
+    get: function () { return _roomId; },
+    set: function (value) { _roomId = value; observable.notify(); },
+    enumerable: true
+  });
+
+  // 计算属性：状态
+  Object.defineProperty(state, 'status', {
+    get: function () { return _status; },
+    set: function (value) { _status = value; observable.notify(); },
+    enumerable: true
+  });
+
+  // 计算属性：状态判断
+  Object.defineProperty(state, 'isIdle', {
+    get: function () { return _status === RoomStatus.IDLE; },
+    enumerable: true
+  });
+
+  Object.defineProperty(state, 'isConnected', {
+    get: function () { return _status === RoomStatus.JOINED; },
+    enumerable: true
+  });
+
+  Object.defineProperty(state, 'isConnecting', {
+    get: function () {
+      return _status === RoomStatus.CONNECTING || _status === RoomStatus.RECONNECTING;
+    },
+    enumerable: true
+  });
+
+  // 计算属性：WebSocket
+  Object.defineProperty(state, 'ws', {
+    get: function () { return _ws; },
+    set: function (value) { _ws = value; observable.notify(); },
+    enumerable: true
+  });
+
+  Object.defineProperty(state, 'isWebSocketOpen', {
+    get: function () { return _ws && _ws.readyState === WebSocket.OPEN; },
+    enumerable: true
+  });
+
+  Object.defineProperty(state, 'isWebSocketConnecting', {
+    get: function () {
+      return _ws && (_ws.readyState === WebSocket.OPEN || _ws.readyState === WebSocket.CONNECTING);
+    },
+    enumerable: true
+  });
+
+  // 计算属性：重连状态
+  Object.defineProperty(state, 'manualClose', {
+    get: function () { return _manualClose; },
+    set: function (value) { _manualClose = value; observable.notify(); },
+    enumerable: true
+  });
+
+  Object.defineProperty(state, 'retryJoinAfterClose', {
+    get: function () { return _retryJoinAfterClose; },
+    set: function (value) { _retryJoinAfterClose = value; observable.notify(); },
+    enumerable: true
+  });
+
+  Object.defineProperty(state, 'reconnectTimer', {
+    get: function () { return _reconnectTimer; },
+    set: function (value) { _reconnectTimer = value; observable.notify(); },
+    enumerable: true
+  });
+
+  Object.defineProperty(state, 'reconnectAttempts', {
+    get: function () { return _reconnectAttempts; },
+    enumerable: true
+  });
+
+  // 计算属性：成员列表
+  Object.defineProperty(state, 'lastMembers', {
+    get: function () { return _lastMembers.slice(); },
+    set: function (value) { _lastMembers = Array.isArray(value) ? value.slice() : []; observable.notify(); },
+    enumerable: true
+  });
+
+  return state;
 }

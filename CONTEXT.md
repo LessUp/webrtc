@@ -99,6 +99,34 @@ new → connecting → connected → disconnected → closed/failed
 
 ---
 
+## 架构概念
+
+### BrowserApi（浏览器 API 抽象层）
+
+浏览器原生 API 的抽象接口，用于解耦控制器与浏览器环境的直接依赖。
+
+- 提供工厂方法：`createWebSocket`、`createPeerConnection`、`getUserMedia`、`getDisplayMedia`
+- 生产环境使用真实实现，测试环境注入 mock
+- 目的：解锁控制器单元测试能力
+
+### Observable（可观察状态）
+
+状态订阅模式的核心实现，提供 `subscribe` 和 `notify` 方法。
+
+- 被状态模块复用，消除订阅逻辑重复
+- 支持重入保护（防止 notify 循环）
+
+### 协议同步验证
+
+自动化脚本检查 YAML、Go、JS 三处协议定义的一致性。
+
+- 检查消息类型 enum 一致性
+- 检查错误码 enum 一致性
+- 检查字段名一致性
+- 集成到 `make check`
+
+---
+
 ## 错误码
 
 信令服务器定义的错误码：
