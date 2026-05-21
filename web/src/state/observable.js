@@ -9,8 +9,8 @@
  * @returns {Object} 包含 subscribe 和 notify 方法的对象
  */
 export function createObservable() {
-  var subscribers = new Set();
-  var notifying = false;
+  let subscribers = new Set();
+  let notifying = false;
 
   /**
    * 订阅状态变化

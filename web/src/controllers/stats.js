@@ -1,7 +1,7 @@
 export function createStatsController(appState) {
-  var pollInterval = null;
+  let pollInterval = null;
   // Use WeakMap to automatically clean up when peer connections are closed
-  var prevStats = new WeakMap();
+  let prevStats = new WeakMap();
 
   // 获取子状态引用
   const peers = appState.peers;
@@ -12,7 +12,7 @@ export function createStatsController(appState) {
   }
 
   function extractOutboundVideo(report) {
-    for (var entry of report.values()) {
+    for (const entry of report.values()) {
       if (entry.type === 'outbound-rtp' && entry.kind === 'video') {
         return entry;
       }
@@ -21,7 +21,7 @@ export function createStatsController(appState) {
   }
 
   function extractCandidatePair(report) {
-    for (var entry of report.values()) {
+    for (const entry of report.values()) {
       if (entry.type === 'candidate-pair' && entry.state === 'succeeded') {
         return entry;
       }
@@ -30,7 +30,7 @@ export function createStatsController(appState) {
   }
 
   function extractInboundRtp(report, kind) {
-    for (var entry of report.values()) {
+    for (const entry of report.values()) {
       if (entry.type === 'inbound-rtp' && entry.kind === kind) {
         return entry;
       }
@@ -39,7 +39,7 @@ export function createStatsController(appState) {
   }
 
   function extractTrack(report, kind) {
-    for (var entry of report.values()) {
+    for (const entry of report.values()) {
       if (entry.type === 'track' && entry.kind === kind) {
         return entry;
       }
@@ -49,14 +49,14 @@ export function createStatsController(appState) {
 
   function computeStats(pc) {
     return pc.getStats().then(function (report) {
-      var video = extractOutboundVideo(report);
-      var audioIn = extractInboundRtp(report, 'audio');
-      var videoIn = extractTrack(report, 'video');
-      var pair = extractCandidatePair(report);
-      var now = Date.now();
-      var prev = prevStats.get(pc) || {};
+      const video = extractOutboundVideo(report);
+      const audioIn = extractInboundRtp(report, 'audio');
+      const videoIn = extractTrack(report, 'video');
+      const pair = extractCandidatePair(report);
+      const now = Date.now();
+      const prev = prevStats.get(pc) || {};
 
-      var result = {
+      const result = {
         videoBitrate: '--',
         audioLoss: '--',
         rtt: '--',
@@ -65,8 +65,8 @@ export function createStatsController(appState) {
       };
 
       if (video) {
-        var delta = now - (prev.timestamp || now);
-        var bytesDelta = (video.bytesSent || 0) - (prev.bytesSent || 0);
+        const delta = now - (prev.timestamp || now);
+        const bytesDelta = (video.bytesSent || 0) - (prev.bytesSent || 0);
         if (delta > 0 && bytesDelta > 0) {
           result.videoBitrate = formatBitrate(bytesDelta, delta);
         }
@@ -74,7 +74,7 @@ export function createStatsController(appState) {
           result.resolution = video.frameWidth + 'x' + video.frameHeight;
         }
         if (video.codecId) {
-          for (var entry of report.values()) {
+          for (const entry of report.values()) {
             if (entry.id === video.codecId && entry.mimeType) {
               result.codec = entry.mimeType.replace('video/', '');
               break;
@@ -84,8 +84,8 @@ export function createStatsController(appState) {
       }
 
       if (audioIn) {
-        var total = audioIn.packetsReceived || 0;
-        var lost = audioIn.packetsLost || 0;
+        const total = audioIn.packetsReceived || 0;
+        const lost = audioIn.packetsLost || 0;
         if (total > 0) {
           result.audioLoss = (lost / total * 100).toFixed(1) + '%';
         }

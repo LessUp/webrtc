@@ -25,16 +25,18 @@ NC='\033[0m' # No Color
 echo "检查协议定义一致性..."
 echo ""
 
-# 从 YAML 提取消息类型 enum（Message schema 下的 type.enum，行 53-64）
+# 从 YAML 提取 Message.type enum（通过锚定 "Message:" schema 下的 type.enum 块）
 extract_yaml_message_types() {
-    sed -n '53,64p' "$YAML_FILE" | \
+    sed -n '/^    Message:/,/^    [A-Z]/p' "$YAML_FILE" | \
+        sed -n '/^          enum:/,/^          [a-z]/p' | \
         grep -E '^\s+-\s+\w+' | \
         sed 's/^\s*-\s*//' | sort -u
 }
 
-# 从 YAML 提取错误码 enum（Error schema 下的 code.enum，行 95-110）
+# 从 YAML 提取 Error.code enum（通过锚定 "Error:" schema 下的 code.enum 块）
 extract_yaml_error_codes() {
-    sed -n '95,110p' "$YAML_FILE" | \
+    sed -n '/^    Error:/,/^    [A-Z]/p' "$YAML_FILE" | \
+        sed -n '/^          enum:/,/^          [a-z]/p' | \
         grep -E '^\s+-\s+\w+' | \
         sed 's/^\s*-\s*//' | sort -u
 }

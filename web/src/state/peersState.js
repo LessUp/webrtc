@@ -10,10 +10,10 @@ import { createObservable } from './observable.js';
  * @returns {Object} Peer 状态接口
  */
 export function createPeersState() {
-  var observable = createObservable();
+  const observable = createObservable();
 
   // 私有状态
-  var _peers = new Map();
+  const _peers = new Map();
 
   /**
    * 获取当前状态快照
@@ -32,7 +32,7 @@ export function createPeersState() {
   function set(peerId, peer) { _peers.set(peerId, peer); observable.notify(); }
   function has(peerId) { return _peers.has(peerId); }
   function remove(peerId) {
-    var result = _peers.delete(peerId);
+    const result = _peers.delete(peerId);
     if (result) observable.notify();
     return result;
   }

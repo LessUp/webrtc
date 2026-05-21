@@ -10,16 +10,16 @@ import { createObservable } from './observable.js';
  * @returns {Object} 媒体状态接口
  */
 export function createMediaState() {
-  var observable = createObservable();
+  const observable = createObservable();
 
   // 私有状态
-  var _localStream = null;
-  var _screenStream = null;
-  var _usingScreen = false;
-  var _muted = false;
-  var _cameraOff = false;
-  var _recorder = null;
-  var _recordedChunks = [];
+  let _localStream = null;
+  let _screenStream = null;
+  let _usingScreen = false;
+  let _muted = false;
+  let _cameraOff = false;
+  let _recorder = null;
+  let _recordedChunks = [];
 
   /**
    * 获取当前状态快照

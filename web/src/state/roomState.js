@@ -10,7 +10,7 @@ import { createObservable } from './observable.js';
  * @readonly
  * @enum {string}
  */
-export var RoomStatus = {
+export const RoomStatus = {
   IDLE: 'idle',
   CONNECTING: 'connecting',
   JOINED: 'joined',
@@ -24,18 +24,18 @@ export var RoomStatus = {
  * @returns {Object} 房间状态接口
  */
 export function createRoomState(options) {
-  var myId = options.myId;
-  var observable = createObservable();
+  const myId = options.myId;
+  const observable = createObservable();
 
   // 私有状态
-  var _roomId = null;
-  var _status = RoomStatus.IDLE;
-  var _ws = null;
-  var _manualClose = false;
-  var _retryJoinAfterClose = false;
-  var _reconnectTimer = null;
-  var _reconnectAttempts = 0;
-  var _lastMembers = [];
+  let _roomId = null;
+  let _status = RoomStatus.IDLE;
+  let _ws = null;
+  let _manualClose = false;
+  let _retryJoinAfterClose = false;
+  let _reconnectTimer = null;
+  let _reconnectAttempts = 0;
+  let _lastMembers = [];
 
   /**
    * 获取当前状态快照
@@ -76,7 +76,7 @@ export function createRoomState(options) {
    */
   function clearReconnectTimer(clearFn) {
     if (_reconnectTimer) {
-      var clear = clearFn || window.clearTimeout.bind(window);
+      const clear = clearFn || window.clearTimeout.bind(window);
       clear(_reconnectTimer);
       _reconnectTimer = null;
       observable.notify();
@@ -100,7 +100,7 @@ export function createRoomState(options) {
   }
 
   // 状态对象
-  var state = {
+  const state = {
     // 常量
     myId: myId,
 

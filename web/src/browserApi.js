@@ -11,8 +11,8 @@
  * @returns {Object} 浏览器 API 接口
  */
 export function createBrowserApi(overrides) {
-  var merged = overrides || {};
-  var api = {
+  const merged = overrides || {};
+  const api = {
     /**
      * 创建 WebSocket 连接
      * @param {string} url - WebSocket URL
